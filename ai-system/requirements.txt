@@ -2,13 +2,13 @@
 # VPS'e kopyalandıktan sonra: pip install -r requirements.txt
 
 # Supabase Python Client
-supabase==2.4.0
+supabase
 
 # Anthropic Claude API
 anthropic==0.18.0
 
 # HTTP Requests (DeepSeek Bytedance API için)
-httpx==0.25.2
+httpx
 
 # Discord Bot
 discord.py==2.3.2
