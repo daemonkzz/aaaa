@@ -31,28 +31,30 @@ export function cloneSceneData(
 ): SceneData {
   // CRITICAL FIX: Filter out deleted elements before saving
   const visibleElements = elements.filter(el => !el.isDeleted);
-  
+
   // Only keep files that are referenced by visible image elements
   const referencedFileIds = new Set(
     visibleElements
       .filter(el => el.type === 'image' && el.fileId)
       .map(el => el.fileId)
   );
-  
+
   const cleanedFiles: BinaryFiles = {};
   for (const [fileId, fileData] of Object.entries(files)) {
     if (referencedFileIds.has(fileId)) {
       cleanedFiles[fileId] = fileData;
     }
   }
-  
-  console.log('[cloneSceneData] Filtering:', {
-    originalElements: elements.length,
-    visibleElements: visibleElements.length,
-    originalFiles: Object.keys(files).length,
-    cleanedFiles: Object.keys(cleanedFiles).length,
-  });
-  
+
+  if (import.meta.env.DEV) {
+    console.log('[cloneSceneData] Filtering:', {
+      originalElements: elements.length,
+      visibleElements: visibleElements.length,
+      originalFiles: Object.keys(files).length,
+      cleanedFiles: Object.keys(cleanedFiles).length,
+    });
+  }
+
   return {
     elements: JSON.parse(JSON.stringify(visibleElements)),
     appState: {
@@ -95,7 +97,7 @@ export function useWhiteboardSync(options: UseWhiteboardSyncOptions = {}) {
   useEffect(() => {
     const loadWhiteboard = async () => {
       try {
-        console.log('[useWhiteboardSync] Loading whiteboard...');
+        if (import.meta.env.DEV) console.log('[useWhiteboardSync] Loading whiteboard...');
         const { data, error } = await supabase
           .from('whiteboards')
           .select('*')
@@ -109,25 +111,25 @@ export function useWhiteboardSync(options: UseWhiteboardSyncOptions = {}) {
         }
 
         if (data) {
-          console.log('[useWhiteboardSync] Loaded whiteboard:', data.id);
+          if (import.meta.env.DEV) console.log('[useWhiteboardSync] Loaded whiteboard:', data.id);
           setWhiteboardId(data.id);
-          
+
           const sceneData = data.scene_data as SceneData | null;
           if (sceneData) {
             const elementCount = sceneData.elements?.length || 0;
             const fileCount = sceneData.files ? Object.keys(sceneData.files).length : 0;
-            
-            console.log('[useWhiteboardSync] Initial data:', { elementCount, fileCount });
+
+            if (import.meta.env.DEV) console.log('[useWhiteboardSync] Initial data:', { elementCount, fileCount });
             setLastSavedStats({ elementCount, fileCount });
             setCurrentStats({ elementCount, fileCount });
-            
+
             if (elementCount > 0) {
               setInitialData(sceneData);
             }
           }
         } else {
           // Create default whiteboard if not exists
-          console.log('[useWhiteboardSync] Creating new whiteboard...');
+          if (import.meta.env.DEV) console.log('[useWhiteboardSync] Creating new whiteboard...');
           const { data: newData, error: createError } = await supabase
             .from('whiteboards')
             .insert({ name: 'Ana Harita', scene_data: { elements: [], appState: {}, files: {} } })
@@ -147,7 +149,7 @@ export function useWhiteboardSync(options: UseWhiteboardSyncOptions = {}) {
         setIsLoading(false);
         setTimeout(() => {
           isHydratingRef.current = false;
-          console.log('[useWhiteboardSync] Hydration complete');
+          if (import.meta.env.DEV) console.log('[useWhiteboardSync] Hydration complete');
         }, 500);
       }
     };
@@ -160,12 +162,12 @@ export function useWhiteboardSync(options: UseWhiteboardSyncOptions = {}) {
     const currentWhiteboardId = whiteboardIdRef.current;
 
     if (!currentWhiteboardId) {
-      console.log('[useWhiteboardSync] Save skipped: no whiteboardId');
+      if (import.meta.env.DEV) console.log('[useWhiteboardSync] Save skipped: no whiteboardId');
       return false;
     }
 
     if (saveInFlightRef.current) {
-      console.log('[useWhiteboardSync] Save skipped: already in flight');
+      if (import.meta.env.DEV) console.log('[useWhiteboardSync] Save skipped: already in flight');
       return false;
     }
 
@@ -177,7 +179,7 @@ export function useWhiteboardSync(options: UseWhiteboardSyncOptions = {}) {
     const fileCount = sceneData.files ? Object.keys(sceneData.files).length : 0;
 
     try {
-      console.log('[useWhiteboardSync] Saving:', { elementCount, fileCount });
+      if (import.meta.env.DEV) console.log('[useWhiteboardSync] Saving:', { elementCount, fileCount });
 
       const { error } = await supabase
         .from('whiteboards')
@@ -210,7 +212,7 @@ export function useWhiteboardSync(options: UseWhiteboardSyncOptions = {}) {
       const savedElementCount = savedScene?.elements?.length || 0;
       const savedFileCount = savedScene?.files ? Object.keys(savedScene.files).length : 0;
 
-      console.log('[useWhiteboardSync] Verified:', { savedElementCount, savedFileCount });
+      if (import.meta.env.DEV) console.log('[useWhiteboardSync] Verified:', { savedElementCount, savedFileCount });
 
       // Check if data was actually saved
       if (elementCount > 0 && savedElementCount === 0) {
@@ -239,18 +241,18 @@ export function useWhiteboardSync(options: UseWhiteboardSyncOptions = {}) {
   // Manual save - prioritizes pending onChange state over API state
   const saveNow = useCallback(async (): Promise<boolean> => {
     const api = excalidrawAPIRef.current;
-    
+
     // First priority: use pending scene (most recent onChange data)
     if (pendingSceneRef.current) {
-      console.log('[useWhiteboardSync] Manual save using pending scene');
+      if (import.meta.env.DEV) console.log('[useWhiteboardSync] Manual save using pending scene');
       const sceneData = pendingSceneRef.current;
-      
+
       // Cancel pending autosave
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = null;
       }
-      
+
       const success = await saveToDatabase(sceneData);
       if (success) {
         pendingSceneRef.current = null;
@@ -260,11 +262,11 @@ export function useWhiteboardSync(options: UseWhiteboardSyncOptions = {}) {
 
     // Fallback: get from API
     if (!api) {
-      console.log('[useWhiteboardSync] Manual save skipped: no API and no pending');
+      if (import.meta.env.DEV) console.log('[useWhiteboardSync] Manual save skipped: no API and no pending');
       return false;
     }
 
-    console.log('[useWhiteboardSync] Manual save using API state');
+    if (import.meta.env.DEV) console.log('[useWhiteboardSync] Manual save using API state');
 
     // Cancel pending autosave
     if (debounceTimerRef.current) {
@@ -290,7 +292,7 @@ export function useWhiteboardSync(options: UseWhiteboardSyncOptions = {}) {
 
     const pending = pendingSceneRef.current;
     if (pending && !saveInFlightRef.current) {
-      console.log('[useWhiteboardSync] Flushing pending save...');
+      if (import.meta.env.DEV) console.log('[useWhiteboardSync] Flushing pending save...');
       await saveToDatabase(pending);
       pendingSceneRef.current = null;
     }
@@ -306,7 +308,7 @@ export function useWhiteboardSync(options: UseWhiteboardSyncOptions = {}) {
       api.getAppState(),
       api.getFiles()
     );
-    
+
     pendingSceneRef.current = sceneData;
     setHasUnsavedChanges(true);
     setCurrentStats({
@@ -314,10 +316,12 @@ export function useWhiteboardSync(options: UseWhiteboardSyncOptions = {}) {
       fileCount: Object.keys(sceneData.files).length,
     });
 
-    console.log('[useWhiteboardSync] State captured:', {
-      elements: sceneData.elements.length,
-      files: Object.keys(sceneData.files).length,
-    });
+    if (import.meta.env.DEV) {
+      console.log('[useWhiteboardSync] State captured:', {
+        elements: sceneData.elements.length,
+        files: Object.keys(sceneData.files).length,
+      });
+    }
   }, []);
 
   // onChange handler for Excalidraw
@@ -374,7 +378,7 @@ export function useWhiteboardSync(options: UseWhiteboardSyncOptions = {}) {
             updated_at: new Date().toISOString(),
           })
           .eq('id', whiteboardIdRef.current)
-          .then(() => console.log('[useWhiteboardSync] Unmount save complete'));
+          .then(() => { if (import.meta.env.DEV) console.log('[useWhiteboardSync] Unmount save complete'); });
       }
     };
   }, []);
@@ -424,7 +428,7 @@ export function useWhiteboardSync(options: UseWhiteboardSyncOptions = {}) {
     initialData,
     lastSavedStats,
     currentStats,
-    
+
     // Actions
     setExcalidrawAPI,
     handleChange,
@@ -432,7 +436,7 @@ export function useWhiteboardSync(options: UseWhiteboardSyncOptions = {}) {
     flushPendingSave,
     resetWhiteboard,
     captureCurrentState,
-    
+
     // Refs (for advanced use)
     excalidrawAPIRef,
   };

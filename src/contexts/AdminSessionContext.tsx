@@ -250,14 +250,14 @@ export const AdminSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       // Get the current session token
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session?.access_token) {
         return { success: false, error: 'Oturum bulunamadı' };
       }
 
       // Call the secure Edge Function for TOTP verification
       const response = await fetch(
-        'https://bbuatycybtwblwyychag.supabase.co/functions/v1/verify-totp',
+        `${import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || 'https://bbuatycybtwblwyychag.supabase.co/functions/v1'}/verify-totp`,
         {
           method: 'POST',
           headers: {

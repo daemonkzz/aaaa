@@ -108,7 +108,7 @@ export function useWhiteboardViewer(
   // Generate canvas image from scene data
   const generateImage = useCallback(async (sceneData: SceneData): Promise<string | null> => {
     if (!sceneData || !sceneData.elements || sceneData.elements.length === 0) {
-      console.log('[WhiteboardViewer] No elements for render');
+      if (import.meta.env.DEV) console.log('[WhiteboardViewer] No elements for render');
       return null;
     }
 
@@ -118,11 +118,11 @@ export function useWhiteboardViewer(
       const renderableElements = getRenderableElements(elements, files);
 
       if (renderableElements.length === 0) {
-        console.log('[WhiteboardViewer] No renderable elements');
+        if (import.meta.env.DEV) console.log('[WhiteboardViewer] No renderable elements');
         return null;
       }
 
-      console.log('[WhiteboardViewer] Generating canvas with', renderableElements.length, 'elements');
+      if (import.meta.env.DEV) console.log('[WhiteboardViewer] Generating canvas with', renderableElements.length, 'elements');
 
       const canvas = await exportToCanvas({
         elements: renderableElements,
@@ -135,8 +135,8 @@ export function useWhiteboardViewer(
       });
 
       const dataUrl = canvas.toDataURL('image/png');
-      console.log('[WhiteboardViewer] Image generated:', canvas.width, 'x', canvas.height);
-      
+      if (import.meta.env.DEV) console.log('[WhiteboardViewer] Image generated:', canvas.width, 'x', canvas.height);
+
       return dataUrl;
     } catch (err) {
       console.error('[WhiteboardViewer] Render error:', err);
@@ -147,7 +147,7 @@ export function useWhiteboardViewer(
   // Load whiteboard data from database
   const loadWhiteboard = useCallback(async (): Promise<SceneData | null> => {
     try {
-      console.log('[WhiteboardViewer] Loading whiteboard...');
+      if (import.meta.env.DEV) console.log('[WhiteboardViewer] Loading whiteboard...');
       const { data, error } = await supabase
         .from('whiteboards')
         .select('id, scene_data')
@@ -160,20 +160,20 @@ export function useWhiteboardViewer(
       }
 
       if (data) {
-        console.log('[WhiteboardViewer] Loaded whiteboard:', data.id);
+        if (import.meta.env.DEV) console.log('[WhiteboardViewer] Loaded whiteboard:', data.id);
         setWhiteboardId(data.id);
         const sceneData = data.scene_data as SceneData | null;
-        
+
         if (sceneData) {
           const count = sceneData.elements?.length || 0;
           const fCount = sceneData.files ? Object.keys(sceneData.files).length : 0;
-          
-          console.log('[WhiteboardViewer] Scene data:', { elements: count, files: fCount });
+
+          if (import.meta.env.DEV) console.log('[WhiteboardViewer] Scene data:', { elements: count, files: fCount });
           sceneDataRef.current = sceneData;
           setElementCount(count);
           setFileCount(fCount);
           setLastUpdate(new Date());
-          
+
           return sceneData;
         }
       }
@@ -216,7 +216,7 @@ export function useWhiteboardViewer(
   useEffect(() => {
     if (!whiteboardId) return;
 
-    console.log('[WhiteboardViewer] Setting up realtime subscription for:', whiteboardId);
+    if (import.meta.env.DEV) console.log('[WhiteboardViewer] Setting up realtime subscription for:', whiteboardId);
 
     const channel = supabase
       .channel('whiteboard-viewer-realtime')
@@ -229,15 +229,15 @@ export function useWhiteboardViewer(
           filter: `id=eq.${whiteboardId}`,
         },
         async (payload) => {
-          console.log('[WhiteboardViewer] Realtime update received');
+          if (import.meta.env.DEV) console.log('[WhiteboardViewer] Realtime update received');
           const newSceneData = (payload.new as any).scene_data as SceneData;
-          
+
           if (newSceneData) {
             sceneDataRef.current = newSceneData;
             setElementCount(newSceneData.elements?.length || 0);
             setFileCount(newSceneData.files ? Object.keys(newSceneData.files).length : 0);
             setLastUpdate(new Date());
-            
+
             const url = await generateImage(newSceneData);
             if (url) {
               setImageUrl(url);
@@ -246,12 +246,12 @@ export function useWhiteboardViewer(
         }
       )
       .subscribe((status) => {
-        console.log('[WhiteboardViewer] Subscription status:', status);
+        if (import.meta.env.DEV) console.log('[WhiteboardViewer] Subscription status:', status);
         setIsConnected(status === 'SUBSCRIBED');
       });
 
     return () => {
-      console.log('[WhiteboardViewer] Cleaning up realtime subscription');
+      if (import.meta.env.DEV) console.log('[WhiteboardViewer] Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [whiteboardId, generateImage]);

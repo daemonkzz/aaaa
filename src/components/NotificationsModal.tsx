@@ -17,16 +17,16 @@ interface NotificationsModalProps {
   markAllAsRead: () => void;
 }
 
-const NotificationItem = ({ 
-  notification, 
-  onRead 
-}: { 
-  notification: Notification; 
+const NotificationItem = ({
+  notification,
+  onRead
+}: {
+  notification: Notification;
   onRead: (id: string) => void;
 }) => {
-  const timeAgo = formatDistanceToNow(new Date(notification.created_at), { 
-    addSuffix: true, 
-    locale: tr 
+  const timeAgo = formatDistanceToNow(new Date(notification.created_at), {
+    addSuffix: true,
+    locale: tr
   });
 
   return (
@@ -35,22 +35,19 @@ const NotificationItem = ({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className={`p-4 rounded-lg border transition-all cursor-pointer ${
-        notification.is_read 
-          ? 'bg-background/50 border-border/50 opacity-70' 
+      className={`p-4 rounded-lg border transition-all cursor-pointer ${notification.is_read
+          ? 'bg-background/50 border-border/50 opacity-70'
           : 'bg-primary/5 border-primary/20 hover:bg-primary/10'
-      }`}
+        }`}
       onClick={() => !notification.is_read && onRead(notification.id)}
     >
       <div className="flex items-start gap-3">
-        <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${
-          notification.is_read ? 'bg-muted-foreground/30' : 'bg-primary animate-pulse'
-        }`} />
+        <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${notification.is_read ? 'bg-muted-foreground/30' : 'bg-primary animate-pulse'
+          }`} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2 mb-1">
-            <h4 className={`font-medium text-sm truncate ${
-              notification.is_read ? 'text-muted-foreground' : 'text-foreground'
-            }`}>
+            <h4 className={`font-medium text-sm truncate ${notification.is_read ? 'text-muted-foreground' : 'text-foreground'
+              }`}>
               {notification.title}
             </h4>
             {notification.is_global && (
@@ -59,9 +56,8 @@ const NotificationItem = ({
               </span>
             )}
           </div>
-          <p className={`text-sm line-clamp-2 ${
-            notification.is_read ? 'text-muted-foreground/70' : 'text-muted-foreground'
-          }`}>
+          <p className={`text-sm line-clamp-2 ${notification.is_read ? 'text-muted-foreground/70' : 'text-muted-foreground'
+            }`}>
             {notification.content}
           </p>
           <p className="text-xs text-muted-foreground/50 mt-2">
@@ -73,14 +69,14 @@ const NotificationItem = ({
   );
 };
 
-const NotificationsModal = ({ 
-  isOpen, 
-  onClose, 
-  notifications, 
-  unreadCount, 
-  isLoading, 
-  markAsRead, 
-  markAllAsRead 
+const NotificationsModal = ({
+  isOpen,
+  onClose,
+  notifications,
+  unreadCount,
+  isLoading,
+  markAsRead,
+  markAllAsRead
 }: NotificationsModalProps) => {
 
   // Scroll lock - modal açıkken sayfa kaydırmasını engelle
@@ -92,7 +88,7 @@ const NotificationsModal = ({
       document.body.style.width = '100%';
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
-      
+
       return () => {
         document.body.style.position = '';
         document.body.style.top = '';
@@ -115,7 +111,7 @@ const NotificationsModal = ({
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
-          
+
           {/* Modal Container */}
           <motion.div
             className="fixed inset-0 z-[101] flex items-center justify-center p-4"
@@ -133,7 +129,7 @@ const NotificationsModal = ({
               onClick={(e) => e.stopPropagation()}
             >
               {/* Animated glow effects */}
-              <motion.div 
+              <motion.div
                 className="absolute -top-32 -left-32 w-64 h-64 bg-primary/30 rounded-full blur-[100px] pointer-events-none"
                 animate={{
                   x: [0, 50, 0],
@@ -146,7 +142,7 @@ const NotificationsModal = ({
                   ease: "easeInOut",
                 }}
               />
-              <motion.div 
+              <motion.div
                 className="absolute -bottom-32 -right-32 w-64 h-64 bg-primary/25 rounded-full blur-[100px] pointer-events-none"
                 animate={{
                   x: [0, -40, 0],
@@ -159,12 +155,12 @@ const NotificationsModal = ({
                   ease: "easeInOut",
                 }}
               />
-              
+
               {/* Background with gradient border effect */}
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-primary/30 via-primary/10 to-transparent p-[1px]">
                 <div className="h-full w-full rounded-2xl bg-background/95 backdrop-blur-xl" />
               </div>
-              
+
               {/* Content */}
               <div className="relative">
                 {/* Header */}
@@ -181,7 +177,7 @@ const NotificationsModal = ({
                         </p>
                       </div>
                     </div>
-                    
+
                     <motion.button
                       className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
                       onClick={onClose}
@@ -191,10 +187,10 @@ const NotificationsModal = ({
                       <X className="w-5 h-5" />
                     </motion.button>
                   </div>
-                  
+
                   {/* Mark all as read button */}
                   {unreadCount > 0 && (
-                    <motion.div 
+                    <motion.div
                       className="mt-4"
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -211,7 +207,7 @@ const NotificationsModal = ({
                     </motion.div>
                   )}
                 </div>
-                
+
                 {/* Notifications List */}
                 <ScrollArea className="h-[400px]">
                   <div className="p-4 space-y-3">
@@ -244,11 +240,11 @@ const NotificationsModal = ({
                     )}
                   </div>
                 </ScrollArea>
-                
+
                 {/* Footer */}
                 <div className="px-6 py-4 border-t border-border/50">
                   <p className="text-center text-muted-foreground/60 text-xs">
-                    © 2025 Kaze Community
+                    © 2026 Kaze Community
                   </p>
                 </div>
               </div>

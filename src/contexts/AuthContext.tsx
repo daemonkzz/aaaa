@@ -62,12 +62,12 @@ const fetchUserProfile = async (userId: string, shouldSyncDiscord = false): Prom
     .select('id, username, avatar_url, discord_id, is_banned, ban_reason')
     .eq('id', userId)
     .single();
-  
+
   if (error) {
     console.error('Profil yüklenirken hata:', error);
     return null;
   }
-  
+
   return {
     ...data,
     is_banned: data.is_banned ?? false,
@@ -89,15 +89,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('Auth event:', event);
-        
+        if (import.meta.env.DEV) console.log('Auth event:', event);
+
         setSession(session);
         setUser(session?.user ?? null);
         setIsLoading(false);
 
         // Log user info on sign in
         if (event === 'SIGNED_IN' && session?.user) {
-          console.log('Oturum Açıldı:', session.user.email);
+          if (import.meta.env.DEV) console.log('Oturum Açıldı:', session.user.email);
           // Clean URL hash after OAuth redirect
           cleanUrlHash();
           // Fetch profile data with setTimeout to avoid deadlock
@@ -105,7 +105,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           setTimeout(async () => {
             const userProfile = await fetchUserProfile(session.user.id, true);
             if (userProfile?.is_banned) {
-              console.log('Kullanıcı yasaklı, çıkış yapılıyor');
+              if (import.meta.env.DEV) console.log('Kullanıcı yasaklı, çıkış yapılıyor');
               await supabase.auth.signOut();
               setSession(null);
               setUser(null);
@@ -119,7 +119,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
 
         if (event === 'SIGNED_OUT') {
-          console.log('Oturum Kapatıldı');
+          if (import.meta.env.DEV) console.log('Oturum Kapatıldı');
           setProfile(null);
         }
       }
@@ -132,7 +132,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setIsLoading(false);
 
       if (session?.user) {
-        console.log('Mevcut Oturum:', session.user.email);
+        if (import.meta.env.DEV) console.log('Mevcut Oturum:', session.user.email);
         // Clean URL hash if session exists
         cleanUrlHash();
         // Fetch profile data

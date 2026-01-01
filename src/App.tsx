@@ -11,18 +11,20 @@ import { AdminRouteGuard } from "./components/admin/AdminRouteGuard";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import PageLoader from "./components/PageLoader";
 
-// Public pages - direct import
+// Public pages - Index loaded directly for fast initial render, others lazy loaded
 import Index from "./pages/Index";
-import Kurallar from "./pages/Kurallar";
-import Guncellemeler from "./pages/Guncellemeler";
-import GuncellemeDetay from "./pages/GuncellemeDetay";
-import Hikaye from "./pages/Hikaye";
-import GizlilikSozlesmesi from "./pages/GizlilikSozlesmesi";
-import Basvuru from "./pages/Basvuru";
-import BasvuruForm from "./pages/BasvuruForm";
-import BasvuruRevision from "./pages/BasvuruRevision";
-import NotFound from "./pages/NotFound";
 import AmbientParticles from "./components/AmbientParticles";
+
+// Public pages - lazy loaded for better bundle splitting
+const Kurallar = lazy(() => import("./pages/Kurallar"));
+const Guncellemeler = lazy(() => import("./pages/Guncellemeler"));
+const GuncellemeDetay = lazy(() => import("./pages/GuncellemeDetay"));
+const Hikaye = lazy(() => import("./pages/Hikaye"));
+const GizlilikSozlesmesi = lazy(() => import("./pages/GizlilikSozlesmesi"));
+const Basvuru = lazy(() => import("./pages/Basvuru"));
+const BasvuruForm = lazy(() => import("./pages/BasvuruForm"));
+const BasvuruRevision = lazy(() => import("./pages/BasvuruRevision"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Admin pages - lazy loaded for better performance
 const Admin = lazy(() => import("./pages/Admin"));
@@ -59,53 +61,55 @@ const RouteEffects = () => {
   return (
     <>
       {showParticles && <AmbientParticles />}
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/kurallar" element={<Kurallar />} />
-        <Route path="/guncellemeler" element={<Guncellemeler />} />
-        <Route path="/guncellemeler/:id" element={<GuncellemeDetay />} />
-        <Route path="/hikaye" element={<Hikaye />} />
-        <Route path="/gizlilik-sozlesmesi" element={<GizlilikSozlesmesi />} />
-        <Route path="/basvuru" element={<Basvuru />} />
-        <Route path="/basvuru/:formId" element={<BasvuruForm />} />
-        <Route path="/basvuru/:formId/revision" element={<BasvuruRevision />} />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/kurallar" element={<Kurallar />} />
+          <Route path="/guncellemeler" element={<Guncellemeler />} />
+          <Route path="/guncellemeler/:id" element={<GuncellemeDetay />} />
+          <Route path="/hikaye" element={<Hikaye />} />
+          <Route path="/gizlilik-sozlesmesi" element={<GizlilikSozlesmesi />} />
+          <Route path="/basvuru" element={<Basvuru />} />
+          <Route path="/basvuru/:formId" element={<BasvuruForm />} />
+          <Route path="/basvuru/:formId/revision" element={<BasvuruRevision />} />
 
-        {/* Admin Routes - Protected with 2FA, Lazy Loaded */}
-        <Route
-          path="/admin/*"
-          element={
-            <AdminSessionProvider>
-              <AdminEditorStateProvider>
-                <AdminRouteGuard>
-                  <Suspense fallback={<PageLoader />}>
-                    <Routes>
-                      <Route index element={<Admin />} />
-                      <Route path="basvuru/:id" element={<AdminBasvuruDetay />} />
-                      <Route path="form-builder" element={<FormBuilder />} />
-                      <Route path="form-builder/:id" element={<FormBuilder />} />
-                      <Route path="update-editor" element={<UpdateEditor />} />
-                      <Route path="update-editor/:id" element={<UpdateEditor />} />
-                      <Route path="rules-editor" element={<RulesEditor />} />
-                      <Route path="gallery" element={<Gallery />} />
-                      <Route path="manage-access" element={<ManageAccess />} />
-                      <Route path="notification-editor" element={<NotificationEditor />} />
-                      <Route path="whiteboard-editor" element={<WhiteboardEditor />} />
-                      <Route path="glossary-editor" element={<GlossaryEditor />} />
-                      <Route path="users" element={<UsersManagement />} />
-                      <Route path="permissions" element={<PermissionsEditor />} />
-                      <Route path="ai-management" element={<AIManagement />} />
-                      <Route path="locked" element={<Locked />} />
-                    </Routes>
-                  </Suspense>
-                </AdminRouteGuard>
-              </AdminEditorStateProvider>
-            </AdminSessionProvider>
-          }
-        />
+          {/* Admin Routes - Protected with 2FA, Lazy Loaded */}
+          <Route
+            path="/admin/*"
+            element={
+              <AdminSessionProvider>
+                <AdminEditorStateProvider>
+                  <AdminRouteGuard>
+                    <Suspense fallback={<PageLoader />}>
+                      <Routes>
+                        <Route index element={<Admin />} />
+                        <Route path="basvuru/:id" element={<AdminBasvuruDetay />} />
+                        <Route path="form-builder" element={<FormBuilder />} />
+                        <Route path="form-builder/:id" element={<FormBuilder />} />
+                        <Route path="update-editor" element={<UpdateEditor />} />
+                        <Route path="update-editor/:id" element={<UpdateEditor />} />
+                        <Route path="rules-editor" element={<RulesEditor />} />
+                        <Route path="gallery" element={<Gallery />} />
+                        <Route path="manage-access" element={<ManageAccess />} />
+                        <Route path="notification-editor" element={<NotificationEditor />} />
+                        <Route path="whiteboard-editor" element={<WhiteboardEditor />} />
+                        <Route path="glossary-editor" element={<GlossaryEditor />} />
+                        <Route path="users" element={<UsersManagement />} />
+                        <Route path="permissions" element={<PermissionsEditor />} />
+                        <Route path="ai-management" element={<AIManagement />} />
+                        <Route path="locked" element={<Locked />} />
+                      </Routes>
+                    </Suspense>
+                  </AdminRouteGuard>
+                </AdminEditorStateProvider>
+              </AdminSessionProvider>
+            }
+          />
 
-        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </>
   );
 };
