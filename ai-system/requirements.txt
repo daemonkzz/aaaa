@@ -1,10 +1,9 @@
 # Kaze AI System - Requirements
 # VPS'e kopyalandıktan sonra: pip install -r requirements.txt
 
-# Supabase
-supabase==2.4.0
+# Supabase (Son sürüm websockets 13+ destekler)
+supabase>=2.10.0
 websockets>=13.0
-httpx==0.25.2
 
 # AI Clients
 anthropic==0.18.0
