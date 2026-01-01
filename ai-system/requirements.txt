@@ -1,0 +1,26 @@
+# Kaze AI System - Requirements
+# VPS'e kopyalandıktan sonra: pip install -r requirements.txt
+
+# Supabase Python Client
+supabase==2.4.0
+
+# Anthropic Claude API
+anthropic==0.18.0
+
+# HTTP Requests (DeepSeek Bytedance API için)
+httpx==0.27.0
+
+# Discord Bot
+discord.py==2.3.2
+
+# Environment Variables
+python-dotenv==1.0.0
+
+# Async Support
+asyncio-compat==0.1.0
+
+# Logging
+loguru==0.7.2
+
+# Scheduling
+schedule==1.2.1

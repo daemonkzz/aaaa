@@ -1,0 +1,10 @@
+project_id = "bbuatycybtwblwyychag"
+
+[functions.verify-totp]
+verify_jwt = false
+
+[functions.send-to-discord]
+verify_jwt = false
+
+[functions.send-discord-dm]
+verify_jwt = false

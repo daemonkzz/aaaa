@@ -1,0 +1,26 @@
+[Unit]
+Description=Kaze AI Application Review Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/kaze40/ai-system
+ExecStart=/usr/bin/python3 daemon.py
+Restart=always
+RestartSec=30
+StandardOutput=append:/var/log/kaze-ai/daemon.log
+StandardError=append:/var/log/kaze-ai/error.log
+
+# Environment
+EnvironmentFile=/var/www/kaze40/ai-system/.env
+
+# Memory limit (OOM protection)
+MemoryMax=512M
+
+# Graceful shutdown
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target
