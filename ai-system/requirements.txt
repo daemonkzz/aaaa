@@ -16,7 +16,6 @@ discord.py==2.3.2
 # Environment Variables
 python-dotenv==1.0.0
 
-
 # Logging
 loguru==0.7.2
 
