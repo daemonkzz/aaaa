@@ -16,5 +16,4 @@ supabase>=2.10.0
 # Discord
 discord.py>=2.3.2
 
-# Async Utils
-db-analytics
+
