@@ -8,7 +8,7 @@ supabase
 anthropic==0.18.0
 
 # HTTP Requests (DeepSeek Bytedance API için)
-httpx
+httpx==0.25.2
 
 # Discord Bot
 discord.py==2.3.2
