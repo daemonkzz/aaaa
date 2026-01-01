@@ -1,17 +1,20 @@
 # Kaze AI System - Requirements
-# VPS'e kopyalandıktan sonra: pip install -r requirements.txt
+# Bu dosya sanal ortam (venv) içine kurulmaldır.
 
-# Supabase (Son sürüm websockets 13+ destekler)
+# Base Utils
+python-dotenv
+loguru
+schedule
+
+# AI Clients (Latest versions)
+anthropic>=0.40.0
+# httpx will be pulled by anthropic/supabase automatically
+
+# Supabase (Latest)
 supabase>=2.10.0
-websockets>=13.0
-
-# AI Clients
-anthropic==0.18.0
 
 # Discord
-discord.py==2.3.2
+discord.py>=2.3.2
 
-# Utilities
-python-dotenv==1.0.0
-loguru==0.7.2
-schedule==1.2.1
+# Async Utils
+db-analytics
