@@ -1,6 +1,6 @@
 import { motion, Variants } from "framer-motion";
 import { Puzzle, Skull, Target, Users, Package } from "lucide-react";
-import portalSilhouette from "@/assets/portal-silhouette.png";
+import portalSilhouette from "@/assets/portal-silhouette.webp";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 
 const WhatIsSection = () => {
