@@ -82,18 +82,20 @@ const CTASection = () => {
             ))}
           </div>
 
-          {/* Zombie Image - extends below into footer */}
+          {/* Zombie Image - cropped view, legs extend behind footer */}
           <motion.div
             className="relative z-10"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={isVisible ? { opacity: 1, scale: 1 } : {}}
             transition={{ duration: 0.8, delay: 0.2 }}
           >
-            <div className="relative mx-auto w-[360px] md:w-[480px]">
+            {/* Container with fixed height to crop visible area */}
+            <div className="relative mx-auto w-[360px] md:w-[480px] h-[400px] md:h-[520px] overflow-visible">
+              {/* Image positioned so top is visible, bottom extends below */}
               <img
                 src={portalSilhouette}
                 alt="Zombie"
-                className="w-full h-auto object-contain"
+                className="absolute top-0 left-0 w-full h-auto object-contain"
               />
             </div>
           </motion.div>
