@@ -61,80 +61,70 @@ const WhatIsSection = () => {
         <div className="lg:hidden">
           {/* Mobile: Title + Image side by side */}
           <div className="flex items-start gap-4">
-            {/* Title */}
+            {/* Title - static glow, no animation for performance */}
             <motion.div className="flex-1" variants={itemVariants}>
               <h2 className="font-display text-[52px] sm:text-[62px] text-foreground leading-[0.9] tracking-tight italic uppercase font-bold">
-                <motion.span
+                <span
                   className="text-primary"
-                  animate={isVisible ? {
-                    textShadow: [
-                      "0 0 20px hsl(var(--primary) / 0.5)",
-                      "0 0 40px hsl(var(--primary) / 0.8)",
-                      "0 0 20px hsl(var(--primary) / 0.5)",
-                    ],
-                  } : {}}
-                  transition={{ duration: 2, repeat: Infinity }}
+                  style={{ textShadow: "0 0 30px hsl(var(--primary) / 0.6)" }}
                 >
                   KAZE<span className="text-foreground">-</span>Z
-                </motion.span><br />
+                </span><br />
                 NEDİR?
               </h2>
             </motion.div>
 
-            {/* Portal Image - smaller on mobile */}
+            {/* Portal Image - static glow for mobile performance */}
             <motion.div
               className="w-[100px] sm:w-[140px] flex-shrink-0"
               variants={itemVariants}
             >
               <div className="aspect-[3/4] relative">
-                <motion.div
-                  className="absolute inset-0 pointer-events-none"
+                {/* Static glow - no animation */}
+                <div
+                  className="absolute inset-0 pointer-events-none opacity-70"
                   style={{
                     background: "radial-gradient(ellipse 45% 55% at 50% 50%, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.4) 35%, transparent 65%)",
                     filter: "blur(30px)",
                   }}
-                  animate={isVisible ? { opacity: [0.6, 0.85, 0.6] } : {}}
-                  transition={{ duration: 3, repeat: Infinity }}
                 />
-                <motion.img
+                <img
                   src={portalSilhouette}
                   alt="Portal silhouette"
                   loading="lazy"
                   decoding="async"
                   className="relative z-10 w-full h-full object-contain"
-                  initial={{ scale: 1.05, opacity: 0 }}
-                  animate={isVisible ? { scale: 1, opacity: 1 } : {}}
-                  transition={{ duration: 1, ease: "easeOut" }}
                 />
-                <motion.div
-                  className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-[80%] h-[30px]"
+                {/* Static floor reflection */}
+                <div
+                  className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-[80%] h-[30px] opacity-60"
                   style={{
                     background: "radial-gradient(ellipse 100% 100% at 50% 0%, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.3) 50%, transparent 80%)",
                     filter: "blur(10px)",
                   }}
-                  animate={isVisible ? { opacity: [0.5, 0.8, 0.5] } : {}}
-                  transition={{ duration: 2, repeat: Infinity }}
                 />
               </div>
             </motion.div>
           </div>
 
-          {/* Mobile: Horizontal scroll cards */}
-          <div className="mt-4 flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          {/* Mobile: Horizontal scroll cards - All 5 cards */}
+          <div className="mt-4 flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
+            {/* Card 1 - Story Impact */}
             <motion.div
-              className="flex-shrink-0 w-[200px] sm:w-[240px] relative bg-[#222222] rounded-xl p-4 border border-white/[0.06] cursor-pointer overflow-hidden"
+              className="flex-shrink-0 w-[260px] sm:w-[280px] relative bg-[#222222] rounded-xl p-4 border border-white/[0.06] cursor-pointer overflow-hidden snap-center"
               variants={itemVariants}
             >
               <div className="w-6 h-6 flex items-center justify-center mb-2">
                 <Puzzle className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-foreground/60 text-[10px] leading-relaxed">
-                You'll find yourself inside a mysterious space where logic is your main tool.
+              <p className="text-foreground/60 text-[11px] leading-relaxed">
+                Kaze-Z'de RP, anlık sahneler değil birikimli hikâye demektir. Attığın her adım; fraksiyonları, diplomasi dengelerini ve hayatta kalma düzenini etkiler.
               </p>
             </motion.div>
 
+            {/* Card 2 - Survival Horror */}
             <motion.div
-              className="flex-shrink-0 w-[200px] sm:w-[240px] relative bg-[#222222] rounded-xl p-4 border border-white/[0.06] cursor-pointer overflow-hidden"
+              className="flex-shrink-0 w-[260px] sm:w-[280px] relative bg-[#222222] rounded-xl p-4 border border-white/[0.06] cursor-pointer overflow-hidden snap-center"
               variants={itemVariants}
             >
               <div
@@ -146,20 +136,53 @@ const WhatIsSection = () => {
               <div className="w-6 h-6 flex items-center justify-center mb-2 relative z-10">
                 <Skull className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-foreground/55 text-[10px] leading-relaxed relative z-10">
-                You're not entering a game — you're entering a different universe.
+              <p className="text-foreground/55 text-[11px] leading-relaxed relative z-10">
+                Tehdit sadece yaşayan ölüler değil. Açlık, enfeksiyon riski ve insan doğasının karanlık yüzüyle de savaşmalısınız.
               </p>
             </motion.div>
 
+            {/* Card 3 - Consequences */}
             <motion.div
-              className="flex-shrink-0 w-[200px] sm:w-[240px] bg-[#222222] rounded-xl p-4 border border-white/[0.06] cursor-pointer"
+              className="flex-shrink-0 w-[260px] sm:w-[280px] bg-[#222222] rounded-xl p-4 border border-white/[0.06] cursor-pointer snap-center"
               variants={itemVariants}
             >
               <div className="w-6 h-6 flex items-center justify-center mb-2">
                 <Target className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-foreground/55 text-[10px] leading-relaxed">
-                Every detail is key. Careful attention will determine your fate.
+              <p className="text-foreground/55 text-[11px] leading-relaxed">
+                Attığınız her adım, kurduğunuz her cümle geleceğinizi şekillendirir. Burada eylemlerinizin ciddi ve bağlayıcı sonuçları vardır.
+              </p>
+            </motion.div>
+
+            {/* Card 4 - Factions */}
+            <motion.div
+              className="flex-shrink-0 w-[260px] sm:w-[280px] relative bg-[#222222] rounded-xl p-4 border border-white/[0.06] cursor-pointer overflow-hidden snap-center"
+              variants={itemVariants}
+            >
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: "linear-gradient(135deg, transparent 0%, transparent 30%, hsl(var(--primary) / 0.08) 60%, hsl(var(--primary) / 0.2) 100%)",
+                }}
+              />
+              <div className="w-6 h-6 flex items-center justify-center mb-2 relative z-10">
+                <Users className="w-4 h-4 text-primary" />
+              </div>
+              <p className="text-foreground/55 text-[11px] leading-relaxed relative z-10">
+                Karakuyu'nun disiplini, Cennet'in umudu, Aurora'nın bilimi veya Obsidyen'in fırsatçılığı arasında sıkışmış bu dünyada hayatta kalın.
+              </p>
+            </motion.div>
+
+            {/* Card 5 - Loot */}
+            <motion.div
+              className="flex-shrink-0 w-[260px] sm:w-[280px] bg-[#222222] rounded-xl p-4 border border-white/[0.06] cursor-pointer snap-center"
+              variants={itemVariants}
+            >
+              <div className="w-6 h-6 flex items-center justify-center mb-2">
+                <Package className="w-4 h-4 text-primary" />
+              </div>
+              <p className="text-foreground/55 text-[11px] leading-relaxed">
+                Eski dünyanın çöpleri, yeni dünyanın hazinesidir. Burada zenginlik kafanızdakilerle ve çantanızdakilerle ölçülür.
               </p>
             </motion.div>
           </div>

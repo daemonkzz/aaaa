@@ -40,7 +40,18 @@ const TestimonialsSection = () => {
   const { ref: sectionRef, isVisible } = useScrollReveal({ threshold: 0.2 });
   const [activeIndex, setActiveIndex] = useState(1);
   const [direction, setDirection] = useState(1);
-  const particles = useMemo(() => generateParticles(20), []);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile on mount
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Reduce particles on mobile for better performance
+  const particles = useMemo(() => generateParticles(isMobile ? 6 : 20), [isMobile]);
   const [updateNotes, setUpdateNotes] = useState<UpdateNote[]>([]);
 
   // Fetch updates from database
@@ -95,7 +106,7 @@ const TestimonialsSection = () => {
           style={{
             background: "radial-gradient(circle, hsl(var(--primary) / 0.05) 0%, transparent 60%)",
           }}
-          animate={{ 
+          animate={{
             x: [0, 50, 0],
             y: [0, 30, 0],
           }}
@@ -106,7 +117,7 @@ const TestimonialsSection = () => {
           style={{
             background: "radial-gradient(circle, hsl(var(--primary) / 0.04) 0%, transparent 60%)",
           }}
-          animate={{ 
+          animate={{
             x: [0, -40, 0],
             y: [0, -30, 0],
           }}
@@ -122,7 +133,7 @@ const TestimonialsSection = () => {
           animate={isVisible ? { opacity: 1, y: 0, scale: 1 } : {}}
           transition={{ duration: 0.8, ease: "easeOut" }}
         >
-          <motion.h2 
+          <motion.h2
             className="font-display text-[60px] md:text-[70px] lg:text-[90px] text-foreground leading-[0.9] tracking-tight italic"
             animate={isVisible ? {
               textShadow: [
@@ -163,7 +174,7 @@ const TestimonialsSection = () => {
                 ease: "easeInOut",
               }}
             />
-            
+
             <AnimatePresence mode="sync">
               {testimonialCards.map((card, index) => {
                 const style = getCardStyle(index);
@@ -263,9 +274,8 @@ const TestimonialsSection = () => {
             {testimonialCards.map((_, index) => (
               <motion.button
                 key={index}
-                className={`w-2 h-2 rounded-full transition-colors ${
-                  index === activeIndex ? "bg-primary" : "bg-foreground/20"
-                }`}
+                className={`w-2 h-2 rounded-full transition-colors ${index === activeIndex ? "bg-primary" : "bg-foreground/20"
+                  }`}
                 whileHover={{ scale: 1.3 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={() => {
@@ -285,14 +295,14 @@ const TestimonialsSection = () => {
           transition={{ duration: 0.8, delay: 0.3 }}
         >
           {/* Title - matching site style with enhanced animation */}
-          <motion.h3 
+          <motion.h3
             className="font-display text-[32px] sm:text-[42px] md:text-[56px] lg:text-[70px] text-foreground leading-[0.9] tracking-tight italic uppercase font-bold mb-6 md:mb-10"
             initial={{ opacity: 0, x: -50 }}
             animate={isVisible ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.7, delay: 0.4, ease: "easeOut" }}
           >
             GÜNCELLEME<br />
-            <motion.span 
+            <motion.span
               className="text-primary"
               animate={isVisible ? {
                 textShadow: [
@@ -308,11 +318,10 @@ const TestimonialsSection = () => {
           </motion.h3>
 
           {/* Cards container with conditional centering */}
-          <div className={`flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory md:overflow-visible md:pb-0 scrollbar-hide ${
-            updateNotes.length < 3 
-              ? 'md:flex md:justify-center md:gap-8' 
+          <div className={`flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory md:overflow-visible md:pb-0 scrollbar-hide ${updateNotes.length < 3
+              ? 'md:flex md:justify-center md:gap-8'
               : 'md:grid md:grid-cols-3 md:gap-8'
-          }`}>
+            }`}>
             {updateNotes.length === 0 ? (
               <div className="text-center py-12 w-full">
                 <p className="text-muted-foreground">Henüz güncelleme bulunmuyor.</p>
@@ -328,25 +337,25 @@ const TestimonialsSection = () => {
                     className="h-full snap-center bg-[#1a1a1a] rounded-xl md:rounded-2xl overflow-hidden border border-white/[0.06] cursor-pointer group relative"
                     initial={{ opacity: 0, y: 40, scale: 0.95 }}
                     animate={isVisible ? { opacity: 1, y: 0, scale: 1 } : {}}
-                    transition={{ 
-                      duration: 0.6, 
+                    transition={{
+                      duration: 0.6,
                       delay: 0.5 + index * 0.12,
                       ease: [0.25, 0.46, 0.45, 0.94]
                     }}
-                    whileHover={{ 
-                      y: -10, 
+                    whileHover={{
+                      y: -10,
                       scale: 1.02,
                       transition: { duration: 0.3 }
                     }}
                   >
                     {/* Hover glow effect */}
-                    <motion.div 
+                    <motion.div
                       className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none z-10"
                       style={{
                         background: "radial-gradient(circle at 50% 0%, hsl(var(--primary) / 0.15) 0%, transparent 60%)",
                       }}
                     />
-                    
+
                     {/* Image */}
                     <div className="aspect-video relative overflow-hidden">
                       {note.cover_image_url ? (
@@ -359,7 +368,7 @@ const TestimonialsSection = () => {
                         <>
                           <div className="w-full h-full bg-gradient-to-br from-secondary/50 to-secondary/20" />
                           {/* Animated background pattern */}
-                          <motion.div 
+                          <motion.div
                             className="absolute inset-0"
                             style={{
                               backgroundImage: "radial-gradient(circle at 30% 70%, hsl(var(--primary) / 0.3) 0%, transparent 50%)",
@@ -371,9 +380,9 @@ const TestimonialsSection = () => {
                           />
                         </>
                       )}
-                      
+
                       {/* Shimmer effect */}
-                      <motion.div 
+                      <motion.div
                         className="absolute inset-0 opacity-0 group-hover:opacity-100"
                         style={{
                           background: "linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.1) 50%, transparent 100%)",
@@ -384,11 +393,11 @@ const TestimonialsSection = () => {
 
                       {/* Gradient overlay */}
                       <div className="absolute inset-0 bg-gradient-to-t from-[#1a1a1a] via-transparent to-transparent" />
-                      
+
                       {/* Version badge - top left */}
                       <div className="absolute top-3 left-3 h-6">
                         {note.version && (
-                          <motion.div 
+                          <motion.div
                             className="bg-primary/90 text-background text-[10px] md:text-xs font-bold px-2.5 py-1 rounded-full"
                             whileHover={{ scale: 1.1 }}
                           >
@@ -415,10 +424,10 @@ const TestimonialsSection = () => {
                         className="text-primary text-xs md:text-sm font-medium flex items-center gap-2"
                       >
                         Devamını Oku
-                        <motion.svg 
-                          className="w-4 h-4" 
-                          fill="none" 
-                          stroke="currentColor" 
+                        <motion.svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
                           viewBox="0 0 24 24"
                           animate={{ x: [0, 3, 0] }}
                           transition={{ duration: 1.5, repeat: Infinity }}
@@ -432,7 +441,7 @@ const TestimonialsSection = () => {
               ))
             )}
           </div>
-          
+
           {/* Mobile scroll indicator dots */}
           {updateNotes.length > 0 && (
             <div className="flex justify-center gap-2 mt-4 md:hidden">
