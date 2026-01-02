@@ -37,7 +37,7 @@ const CTASection = () => {
   };
 
   return (
-    <section className="py-10 md:py-24 lg:py-28 relative overflow-visible">
+    <section className="py-10 md:py-24 lg:py-28 relative overflow-hidden">
       {/* Subtle ambient glow - no animation */}
       <div
         className="absolute inset-0 pointer-events-none opacity-60"
