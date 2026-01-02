@@ -89,11 +89,11 @@ const CTASection = () => {
             animate={isVisible ? { opacity: 1, scale: 1 } : {}}
             transition={{ duration: 0.8, delay: 0.2 }}
           >
-            <div className="relative mx-auto w-72 md:w-96 aspect-[3/4]">
+            <div className="relative mx-auto w-[360px] md:w-[480px] aspect-[4/5] overflow-hidden">
               <img
                 src={portalSilhouette}
                 alt="Zombie"
-                className="w-full h-full object-contain"
+                className="w-full h-[130%] object-cover object-top"
               />
             </div>
           </motion.div>
