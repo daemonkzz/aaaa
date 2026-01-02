@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import portalSilhouette from "@/assets/portal-silhouette.png";
+import portalSilhouette from "@/assets/portal-silhouette.webp";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { useAuth } from "@/contexts/AuthContext";
 import LoginModal from "@/components/LoginModal";
@@ -37,7 +37,7 @@ const CTASection = () => {
   };
 
   return (
-    <section className="py-10 md:py-24 lg:py-28 relative overflow-hidden">
+    <section className="py-10 md:py-24 lg:py-28 relative overflow-visible">
       {/* Subtle ambient glow - no animation */}
       <div
         className="absolute inset-0 pointer-events-none opacity-60"
@@ -82,18 +82,18 @@ const CTASection = () => {
             ))}
           </div>
 
-          {/* Zombie Image - No glow effects */}
+          {/* Zombie Image - extends below into footer */}
           <motion.div
-            className="mb-0 relative z-10"
+            className="relative z-10"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={isVisible ? { opacity: 1, scale: 1 } : {}}
             transition={{ duration: 0.8, delay: 0.2 }}
           >
-            <div className="relative mx-auto w-[360px] md:w-[480px] aspect-[4/5] overflow-hidden">
+            <div className="relative mx-auto w-[360px] md:w-[480px]">
               <img
                 src={portalSilhouette}
                 alt="Zombie"
-                className="w-full h-[130%] object-cover object-top"
+                className="w-full h-auto object-contain"
               />
             </div>
           </motion.div>
@@ -124,9 +124,9 @@ const CTASection = () => {
             ))}
           </div>
 
-          {/* CTA Button - In front of everything */}
+          {/* CTA Button - Overlaps zombie */}
           <motion.div
-            className="relative z-30 -mt-16 md:-mt-24"
+            className="relative z-30 -mt-32 md:-mt-48"
             initial={{ opacity: 0, y: 30 }}
             animate={isVisible ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.5 }}
