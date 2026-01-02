@@ -33,7 +33,7 @@ const Footer = () => {
   return (
     <motion.footer
       ref={footerRef}
-      className="py-12 border-t border-border/10 relative z-50 bg-background"
+      className="py-12 border-t border-border/10"
       variants={containerVariants}
       initial="hidden"
       animate={isVisible ? "visible" : "hidden"}
