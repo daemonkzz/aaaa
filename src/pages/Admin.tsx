@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { 
-  FileText, 
-  Bell, 
-  Users, 
-  Check, 
-  X, 
+import {
+  FileText,
+  Bell,
+  Users,
+  Check,
+  X,
   Loader2,
   Plus,
   Pencil,
@@ -19,11 +20,15 @@ import {
   Filter,
   Settings,
   Shield,
-  Image as ImageIcon
+  Image as ImageIcon,
+  AlertTriangle,
+  Brain,
+  Eye
 } from 'lucide-react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -55,7 +60,7 @@ import type { UpdateData } from '@/types/update';
 import { DashboardStats } from '@/components/admin/DashboardStats';
 
 type TabType = 'dashboard' | 'basvurular' | 'formlar' | 'guncellemeler' | 'bildirimler' | 'kurallar' | 'galeri' | 'canliharita' | 'kullanicilar' | 'yetkilendirme';
-type ApplicationFilterType = 'all' | 'whitelist' | 'other';
+type ApplicationFilterType = 'all' | 'whitelist' | 'other' | 'conflict' | 'pending';
 type FormFilterType = 'all' | 'whitelist' | 'other';
 type UpdateFilterType = 'all' | 'update' | 'news';
 type UpdateStatusFilterType = 'all' | 'published' | 'draft';
@@ -67,6 +72,12 @@ interface Application {
   content: Record<string, string>;
   status: string;
   created_at: string;
+  ai_processing_status?: string;
+  ai_conflict_status?: string;
+  is_locked?: boolean;
+  locked_by?: string;
+  processed_by_ai?: boolean;
+  ai_evaluation?: Record<string, unknown>;
 }
 
 interface FormTemplate {
@@ -83,11 +94,12 @@ interface FormTemplate {
 const Admin = () => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
+  const { isSuperAdmin } = useUserPermissions();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = (searchParams.get('tab') as TabType) || 'dashboard';
-  
+
   const setActiveTab = (tab: TabType) => {
     setSearchParams({ tab });
   };
@@ -114,7 +126,7 @@ const Admin = () => {
       navigate('/admin/notification-editor');
       return;
     }
-    
+
     // Diğer sekmeler için normal davranış
     setActiveTab(tabId);
   };
@@ -124,23 +136,27 @@ const Admin = () => {
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [deletingFormId, setDeletingFormId] = useState<string | null>(null);
   const [togglingFormId, setTogglingFormId] = useState<string | null>(null);
-  
+
   // Updates
   const [updates, setUpdates] = useState<UpdateData[]>([]);
   const [deletingUpdateId, setDeletingUpdateId] = useState<string | null>(null);
   const [togglingUpdateId, setTogglingUpdateId] = useState<string | null>(null);
-  
+
   // Filters
   const [applicationFilter, setApplicationFilter] = useState<ApplicationFilterType>('all');
   const [formFilter, setFormFilter] = useState<FormFilterType>('all');
   const [updateFilter, setUpdateFilter] = useState<UpdateFilterType>('all');
   const [updateStatusFilter, setUpdateStatusFilter] = useState<UpdateStatusFilterType>('all');
 
+  // Bulk selection for AI (super_admin only)
+  const [selectedApplications, setSelectedApplications] = useState<number[]>([]);
+  const [isSendingToAI, setIsSendingToAI] = useState(false);
+
   // Check if user has admin role
   useEffect(() => {
     const checkAdminRole = async () => {
       if (authLoading) return;
-      
+
       if (!user) {
         toast.error('Bu sayfaya erişmek için giriş yapmalısınız');
         navigate('/');
@@ -246,9 +262,15 @@ const Admin = () => {
   const updateApplicationStatus = async (id: number, status: 'approved' | 'rejected') => {
     setUpdatingId(id);
     try {
+      // Status ve kilitleme birlikte güncelle
       const { error } = await supabase
         .from('applications')
-        .update({ status })
+        .update({
+          status,
+          is_locked: true,
+          locked_by: 'staff',
+          locked_at: new Date().toISOString()
+        })
         .eq('id', id);
 
       if (error) {
@@ -257,13 +279,91 @@ const Admin = () => {
         return;
       }
 
-      toast.success(status === 'approved' ? 'Başvuru onaylandı' : 'Başvuru reddedildi');
+      toast.success(status === 'approved' ? 'Başvuru onaylandı ve kilitlendi' : 'Başvuru reddedildi ve kilitlendi');
       fetchApplications();
     } catch (error) {
       console.error('Update error:', error);
       toast.error('Durum güncellenirken hata oluştu');
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  // AI'a toplu gönder (super_admin only)
+  const sendSelectedToAI = async () => {
+    if (selectedApplications.length === 0) {
+      toast.error('Lütfen en az bir başvuru seçin');
+      return;
+    }
+    if (selectedApplications.length > 50) {
+      toast.error('En fazla 50 başvuru seçebilirsiniz');
+      return;
+    }
+
+    setIsSendingToAI(true);
+    try {
+      const { error } = await supabase
+        .from('applications')
+        .update({
+          ai_processing_status: 'queued',
+          ai_priority: 0
+        })
+        .in('id', selectedApplications);
+
+      if (error) throw error;
+
+      toast.success(`${selectedApplications.length} başvuru AI kuyruğuna eklendi`);
+      setSelectedApplications([]);
+      fetchApplications();
+    } catch (error) {
+      console.error('AI send error:', error);
+      toast.error('Başvurular AI\'a gönderilirken hata oluştu');
+    } finally {
+      setIsSendingToAI(false);
+    }
+  };
+
+  // AI kuyruğundan çıkar (super_admin only)
+  const removeFromAIQueue = async (appId: number) => {
+    try {
+      const { error } = await supabase
+        .from('applications')
+        .update({
+          ai_processing_status: 'pending',
+          ai_priority: 0
+        })
+        .eq('id', appId);
+
+      if (error) throw error;
+
+      toast.success('Başvuru AI kuyruğundan çıkarıldı');
+      fetchApplications();
+    } catch (error) {
+      console.error('Remove from queue error:', error);
+      toast.error('Kuyruktan çıkarılırken hata oluştu');
+    }
+  };
+
+  // Toggle selection
+  const toggleAppSelection = (appId: number) => {
+    setSelectedApplications(prev =>
+      prev.includes(appId)
+        ? prev.filter(id => id !== appId)
+        : [...prev, appId]
+    );
+  };
+
+  // Select all visible
+  const toggleSelectAll = () => {
+    const pendingApps = filteredApplications.filter(app =>
+      app.status === 'pending' &&
+      app.ai_processing_status !== 'processing' &&
+      app.ai_processing_status !== 'queued'
+    );
+    if (selectedApplications.length === pendingApps.length) {
+      setSelectedApplications([]);
+    } else {
+      setSelectedApplications(pendingApps.map(app => app.id));
     }
   };
 
@@ -354,7 +454,7 @@ const Admin = () => {
     try {
       const { error } = await supabase
         .from('updates')
-        .update({ 
+        .update({
           is_published: !currentStatus,
           published_at: !currentStatus ? new Date().toISOString() : null
         })
@@ -425,8 +525,8 @@ const Admin = () => {
 
   const getCharacterName = (content: Record<string, string>) => {
     // Look for common character name fields
-    const nameKeys = Object.keys(content).filter(key => 
-      key.toLowerCase().includes('karakter') || 
+    const nameKeys = Object.keys(content).filter(key =>
+      key.toLowerCase().includes('karakter') ||
       key.toLowerCase().includes('character') ||
       key.toLowerCase().includes('isim') ||
       key.toLowerCase().includes('ad')
@@ -458,11 +558,22 @@ const Admin = () => {
 
   // Get user filter from query params
   const userFilter = searchParams.get('user');
-  
+
   // Filter applications
   const filteredApplications = applications.filter(app => {
     // First filter by user if specified
     if (userFilter && app.user_id !== userFilter) return false;
+
+    // Filter by conflict status (super_admin only)
+    if (applicationFilter === 'conflict') {
+      return app.ai_conflict_status === 'conflict_pending' || app.ai_conflict_status === 'conflict_admin';
+    }
+
+    // Filter by AI processing status (pending in AI queue)
+    if (applicationFilter === 'pending') {
+      return app.ai_processing_status === 'processing' || app.ai_processing_status === 'queued';
+    }
+
     // Then filter by type
     if (applicationFilter === 'all') return true;
     const formType = getFormTypeByFormId(app.type);
@@ -479,7 +590,7 @@ const Admin = () => {
   // Filter updates
   const filteredUpdates = updates.filter(update => {
     const categoryMatch = updateFilter === 'all' || update.category === updateFilter;
-    const statusMatch = updateStatusFilter === 'all' || 
+    const statusMatch = updateStatusFilter === 'all' ||
       (updateStatusFilter === 'published' ? update.is_published : !update.is_published);
     return categoryMatch && statusMatch;
   });
@@ -516,15 +627,15 @@ const Admin = () => {
                   {userFilter ? 'Kullanıcı Başvuruları' : 'Başvurular'}
                 </h2>
                 <p className="text-muted-foreground">
-                  {userFilter 
+                  {userFilter
                     ? `Bu kullanıcının ${filteredApplications.length} başvurusu gösteriliyor`
                     : 'Tüm başvuruları görüntüle ve yönet'
                   }
                 </p>
                 {userFilter && (
-                  <Button 
-                    variant="link" 
-                    size="sm" 
+                  <Button
+                    variant="link"
+                    size="sm"
                     className="px-0 h-auto text-primary"
                     onClick={() => setSearchParams({ tab: 'basvurular' })}
                   >
@@ -532,7 +643,7 @@ const Admin = () => {
                   </Button>
                 )}
               </div>
-              
+
               {/* Application Filter */}
               <div className="flex items-center gap-3">
                 <Filter className="w-4 h-4 text-muted-foreground" />
@@ -544,8 +655,38 @@ const Admin = () => {
                     <SelectItem value="all">Tüm Başvurular</SelectItem>
                     <SelectItem value="whitelist">Whitelist Başvuruları</SelectItem>
                     <SelectItem value="other">Diğer Başvurular</SelectItem>
+                    <SelectItem value="pending">
+                      <div className="flex items-center gap-2">
+                        <Eye className="w-3 h-3 text-blue-400" />
+                        AI Kuyruğunda
+                      </div>
+                    </SelectItem>
+                    {isSuperAdmin && (
+                      <SelectItem value="conflict">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-3 h-3 text-amber-400" />
+                          Çatışmalı
+                        </div>
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
+
+                {/* AI'a Gönder Button - super_admin only */}
+                {isSuperAdmin && selectedApplications.length > 0 && (
+                  <Button
+                    onClick={sendSelectedToAI}
+                    disabled={isSendingToAI}
+                    className="gap-2 bg-blue-600 hover:bg-blue-700"
+                  >
+                    {isSendingToAI ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Brain className="w-4 h-4" />
+                    )}
+                    AI'a Gönder ({selectedApplications.length})
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -557,11 +698,11 @@ const Admin = () => {
               <div className="text-center py-12 bg-card rounded-lg border border-border">
                 <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">
-                  {applicationFilter === 'all' 
+                  {applicationFilter === 'all'
                     ? 'Henüz başvuru bulunmuyor'
                     : applicationFilter === 'whitelist'
-                    ? 'Whitelist başvurusu bulunmuyor'
-                    : 'Diğer başvuru bulunmuyor'
+                      ? 'Whitelist başvurusu bulunmuyor'
+                      : 'Diğer başvuru bulunmuyor'
                   }
                 </p>
               </div>
@@ -570,6 +711,15 @@ const Admin = () => {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-border hover:bg-transparent">
+                      {/* Checkbox for super_admin bulk selection */}
+                      {isSuperAdmin && (
+                        <TableHead className="w-10">
+                          <Checkbox
+                            checked={selectedApplications.length > 0 && selectedApplications.length === filteredApplications.filter(a => a.status === 'pending' && a.ai_processing_status !== 'processing' && a.ai_processing_status !== 'queued').length}
+                            onCheckedChange={toggleSelectAll}
+                          />
+                        </TableHead>
+                      )}
                       <TableHead className="text-muted-foreground">Başvuran</TableHead>
                       <TableHead className="text-muted-foreground">Form</TableHead>
                       <TableHead className="text-muted-foreground">Tip</TableHead>
@@ -582,11 +732,21 @@ const Admin = () => {
                     {filteredApplications.map((app) => {
                       const formType = getFormTypeByFormId(app.type);
                       return (
-                        <TableRow 
-                          key={app.id} 
+                        <TableRow
+                          key={app.id}
                           className="border-border cursor-pointer hover:bg-muted/50"
                           onClick={() => navigate(`/admin/basvuru/${app.id}`)}
                         >
+                          {/* Checkbox for super_admin bulk selection */}
+                          {isSuperAdmin && (
+                            <TableCell onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={selectedApplications.includes(app.id)}
+                                onCheckedChange={() => toggleAppSelection(app.id)}
+                                disabled={app.status !== 'pending' || app.ai_processing_status === 'processing' || app.ai_processing_status === 'queued'}
+                              />
+                            </TableCell>
+                          )}
                           <TableCell className="font-medium text-foreground">
                             {getCharacterName(app.content as Record<string, string>)}
                           </TableCell>
@@ -609,7 +769,36 @@ const Admin = () => {
                             {formatDate(app.created_at)}
                           </TableCell>
                           <TableCell>
-                            {getStatusBadge(app.status)}
+                            <div className="flex items-center gap-2">
+                              {getStatusBadge(app.status)}
+                              {/* AI Processing Status */}
+                              {(app.ai_processing_status === 'processing' || app.ai_processing_status === 'queued') && (
+                                <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 gap-1">
+                                  <Eye className="w-3 h-3" />
+                                  OKUNUYOR
+                                </Badge>
+                              )}
+                              {/* AI Conflict Status */}
+                              {(app.ai_conflict_status === 'conflict_pending' || app.ai_conflict_status === 'conflict_admin') && isSuperAdmin && (
+                                <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 gap-1">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Çatışmalı
+                                </Badge>
+                              )}
+                              {/* AI Badge - super_admin only */}
+                              {app.processed_by_ai && isSuperAdmin && (
+                                <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 gap-1">
+                                  <Brain className="w-3 h-3" />
+                                  AI
+                                </Badge>
+                              )}
+                              {/* Lock Icon */}
+                              {app.is_locked && (
+                                <Badge variant="outline" className="text-muted-foreground gap-1">
+                                  🔒
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
@@ -618,7 +807,7 @@ const Admin = () => {
                                 variant="outline"
                                 className="bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300"
                                 onClick={() => updateApplicationStatus(app.id, 'approved')}
-                                disabled={updatingId === app.id || app.status === 'approved'}
+                                disabled={updatingId === app.id || app.status === 'approved' || (app.is_locked && !isSuperAdmin)}
                               >
                                 {updatingId === app.id ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -632,7 +821,7 @@ const Admin = () => {
                                 variant="outline"
                                 className="bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300"
                                 onClick={() => updateApplicationStatus(app.id, 'rejected')}
-                                disabled={updatingId === app.id || app.status === 'rejected'}
+                                disabled={updatingId === app.id || app.status === 'rejected' || (app.is_locked && !isSuperAdmin)}
                               >
                                 {updatingId === app.id ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -641,6 +830,18 @@ const Admin = () => {
                                 )}
                                 <span className="ml-1">Reddet</span>
                               </Button>
+                              {/* Kuyruğundan Çıkar - super_admin, only for queued items */}
+                              {isSuperAdmin && (app.ai_processing_status === 'queued') && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300"
+                                  onClick={() => removeFromAIQueue(app.id)}
+                                >
+                                  <X className="w-4 h-4" />
+                                  <span className="ml-1">Kuyruktan Çıkar</span>
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -689,11 +890,11 @@ const Admin = () => {
               <div className="text-center py-12 bg-card rounded-lg border border-border">
                 <Settings className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground mb-4">
-                  {formFilter === 'all' 
+                  {formFilter === 'all'
                     ? 'Henüz form şablonu bulunmuyor'
                     : formFilter === 'whitelist'
-                    ? 'Whitelist formu bulunmuyor'
-                    : 'Diğer form bulunmuyor'
+                      ? 'Whitelist formu bulunmuyor'
+                      : 'Diğer form bulunmuyor'
                   }
                 </p>
                 <Button onClick={() => navigate('/admin/form-builder')} className="gap-2">
@@ -996,47 +1197,47 @@ const Admin = () => {
             </div>
           </div>
         )}
-      {/* Delete Form Confirmation Dialog */}
-      <AlertDialog open={!!deletingFormId} onOpenChange={() => setDeletingFormId(null)}>
-        <AlertDialogContent className="bg-card border-border">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-foreground">Formu Sil</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bu formu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-border">İptal</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deletingFormId && deleteFormTemplate(deletingFormId)}
-            >
-              Sil
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        {/* Delete Form Confirmation Dialog */}
+        <AlertDialog open={!!deletingFormId} onOpenChange={() => setDeletingFormId(null)}>
+          <AlertDialogContent className="bg-card border-border">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-foreground">Formu Sil</AlertDialogTitle>
+              <AlertDialogDescription>
+                Bu formu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-border">İptal</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => deletingFormId && deleteFormTemplate(deletingFormId)}
+              >
+                Sil
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-      {/* Delete Update Confirmation Dialog */}
-      <AlertDialog open={!!deletingUpdateId} onOpenChange={() => setDeletingUpdateId(null)}>
-        <AlertDialogContent className="bg-card border-border">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-foreground">Güncellemeyi Sil</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bu güncellemeyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-border">İptal</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deletingUpdateId && deleteUpdate(deletingUpdateId)}
-            >
-              Sil
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        {/* Delete Update Confirmation Dialog */}
+        <AlertDialog open={!!deletingUpdateId} onOpenChange={() => setDeletingUpdateId(null)}>
+          <AlertDialogContent className="bg-card border-border">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-foreground">Güncellemeyi Sil</AlertDialogTitle>
+              <AlertDialogDescription>
+                Bu güncellemeyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-border">İptal</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => deletingUpdateId && deleteUpdate(deletingUpdateId)}
+              >
+                Sil
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AdminLayout>
   );

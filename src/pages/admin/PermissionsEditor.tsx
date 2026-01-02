@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Plus, 
-  Pencil, 
-  Trash2, 
-  Shield, 
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Shield,
   Users,
   Loader2,
   Save,
@@ -66,17 +66,17 @@ interface UserProfile {
 const PermissionsEditor = () => {
   const navigate = useNavigate();
   const { isSuperAdmin, isLoading: permLoading } = useUserPermissions();
-  
+
   const [permissions, setPermissions] = useState<AdminPermission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Modal states
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedPermission, setSelectedPermission] = useState<AdminPermission | null>(null);
-  
+
   // Form states
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
@@ -90,7 +90,8 @@ const PermissionsEditor = () => {
   const [formCanManageNotifications, setFormCanManageNotifications] = useState(false);
   const [formCanManageWhiteboard, setFormCanManageWhiteboard] = useState(false);
   const [formCanManageGlossary, setFormCanManageGlossary] = useState(false);
-  
+  const [formCanViewAIConflicts, setFormCanViewAIConflicts] = useState(false);
+
   // User assignment
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [assignedUsers, setAssignedUsers] = useState<string[]>([]);
@@ -168,6 +169,7 @@ const PermissionsEditor = () => {
       setFormCanManageNotifications(permission.can_manage_notifications);
       setFormCanManageWhiteboard(permission.can_manage_whiteboard);
       setFormCanManageGlossary(permission.can_manage_glossary);
+      setFormCanViewAIConflicts((permission as any).can_view_ai_conflicts || false);
     } else {
       setSelectedPermission(null);
       setFormName('');
@@ -182,6 +184,7 @@ const PermissionsEditor = () => {
       setFormCanManageNotifications(false);
       setFormCanManageWhiteboard(false);
       setFormCanManageGlossary(false);
+      setFormCanViewAIConflicts(false);
     }
     setEditModalOpen(true);
   };
@@ -207,6 +210,7 @@ const PermissionsEditor = () => {
         can_manage_notifications: formCanManageNotifications,
         can_manage_whiteboard: formCanManageWhiteboard,
         can_manage_glossary: formCanManageGlossary,
+        can_view_ai_conflicts: formCanViewAIConflicts,
       };
 
       if (selectedPermission) {
@@ -301,15 +305,15 @@ const PermissionsEditor = () => {
   };
 
   const toggleTab = (tab: TabKey) => {
-    setFormTabs(prev => 
-      prev.includes(tab) 
+    setFormTabs(prev =>
+      prev.includes(tab)
         ? prev.filter(t => t !== tab)
         : [...prev, tab]
     );
   };
 
-  const filteredUsers = allUsers.filter(user => 
-    !userSearch || 
+  const filteredUsers = allUsers.filter(user =>
+    !userSearch ||
     user.username?.toLowerCase().includes(userSearch.toLowerCase())
   );
 
@@ -353,7 +357,7 @@ const PermissionsEditor = () => {
                 <div>
                   <p className="text-sm font-medium text-amber-300">Super Admin Bilgisi</p>
                   <p className="text-sm text-amber-400/80">
-                    Super Admin rolü veritabanından atanır ve tüm yetkilere sahiptir. 
+                    Super Admin rolü veritabanından atanır ve tüm yetkilere sahiptir.
                     Bu sayfadaki yetkiler diğer kullanıcılar içindir.
                   </p>
                 </div>
@@ -372,15 +376,15 @@ const PermissionsEditor = () => {
                       <CardDescription>{permission.description || 'Açıklama yok'}</CardDescription>
                     </div>
                     <div className="flex gap-1">
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         size="icon"
                         onClick={() => openEditModal(permission)}
                       >
                         <Pencil className="w-4 h-4" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         size="icon"
                         onClick={() => {
                           setSelectedPermission(permission);
@@ -412,9 +416,9 @@ const PermissionsEditor = () => {
                       )}
                     </div>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="w-full"
                     onClick={() => openAssignModal(permission)}
                   >
@@ -487,11 +491,10 @@ const PermissionsEditor = () => {
                     {ALL_TABS.filter(tab => tab !== 'yetkilendirme').map(tab => (
                       <div
                         key={tab}
-                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
-                          formTabs.includes(tab) 
-                            ? 'border-primary bg-primary/10' 
+                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${formTabs.includes(tab)
+                            ? 'border-primary bg-primary/10'
                             : 'border-border hover:bg-muted'
-                        }`}
+                          }`}
                         onClick={() => toggleTab(tab)}
                       >
                         <Checkbox checked={formTabs.includes(tab)} />
@@ -548,6 +551,10 @@ const PermissionsEditor = () => {
                     <Label htmlFor="manage-glossary">Sözlük Yönetimi</Label>
                     <Switch id="manage-glossary" checked={formCanManageGlossary} onCheckedChange={setFormCanManageGlossary} />
                   </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="view-ai-conflicts">AI Çatışmalı Formları Görüntüleme</Label>
+                    <Switch id="view-ai-conflicts" checked={formCanViewAIConflicts} onCheckedChange={setFormCanViewAIConflicts} />
+                  </div>
                 </CollapsibleContent>
               </Collapsible>
             </div>
@@ -570,7 +577,7 @@ const PermissionsEditor = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>Yetkiyi Sil</AlertDialogTitle>
               <AlertDialogDescription>
-                "{selectedPermission?.name}" yetkisini silmek istediğinize emin misiniz? 
+                "{selectedPermission?.name}" yetkisini silmek istediğinize emin misiniz?
                 Bu yetkiye sahip kullanıcılar bu yetkileri kaybedecek.
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -604,11 +611,10 @@ const PermissionsEditor = () => {
                 {filteredUsers.map(user => (
                   <div
                     key={user.id}
-                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
-                      assignedUsers.includes(user.id)
+                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${assignedUsers.includes(user.id)
                         ? 'bg-primary/10 border border-primary/30'
                         : 'hover:bg-muted border border-transparent'
-                    }`}
+                      }`}
                     onClick={() => handleToggleUserAssignment(user.id)}
                   >
                     <Avatar className="h-8 w-8">

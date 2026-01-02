@@ -189,3 +189,129 @@ class DatabaseHandler:
             }).execute()
         except Exception as e:
             logger.error(f"Log kaydedilemedi: {e}")
+    
+    # ==========================================
+    # YENİ METHODLAR
+    # ==========================================
+    
+    def get_application_current_status(self, app_id: int) -> Optional[str]:
+        """Başvurunun güncel durumunu getir (pre-check için)"""
+        try:
+            response = self.client.table("applications")\
+                .select("status")\
+                .eq("id", app_id)\
+                .single()\
+                .execute()
+            return response.data.get("status") if response.data else None
+        except Exception as e:
+            logger.error(f"Başvuru durumu alınamadı: {e}")
+            return None
+    
+    def update_application_conflict_status(self, app_id: int, conflict_status: str) -> bool:
+        """Başvurunun çatışma durumunu güncelle"""
+        try:
+            self.client.table("applications").update({
+                "ai_conflict_status": conflict_status
+            }).eq("id", app_id).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Çatışma durumu güncellenemedi: {e}")
+            return False
+    
+    def update_application_dry_run(self, app_id: int, dry_run: bool) -> bool:
+        """Başvurunun dry run flag'ını güncelle"""
+        try:
+            self.client.table("applications").update({
+                "ai_dry_run": dry_run
+            }).eq("id", app_id).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Dry run flag güncellenemedi: {e}")
+            return False
+    
+    def update_daily_stats(self, decision: str, confidence: int, cost: float, has_conflict: bool = False) -> None:
+        """Günlük istatistikleri güncelle"""
+        try:
+            today = datetime.utcnow().date().isoformat()
+            
+            # Bugünkü kaydı bul veya oluştur
+            response = self.client.table("ai_daily_stats")\
+                .select("*")\
+                .eq("stat_date", today)\
+                .execute()
+            
+            if response.data:
+                # Güncelle
+                stats = response.data[0]
+                new_total = stats.get("total_forms_processed", 0) + 1
+                new_avg = ((stats.get("avg_confidence_score", 0) * stats.get("total_forms_processed", 0)) + confidence) / new_total
+                
+                update_data = {
+                    "total_forms_processed": new_total,
+                    "avg_confidence_score": round(new_avg, 2),
+                    "estimated_cost_usd": stats.get("estimated_cost_usd", 0) + cost
+                }
+                
+                if decision == "approved":
+                    update_data["approved_count"] = stats.get("approved_count", 0) + 1
+                elif decision == "rejected":
+                    update_data["rejected_count"] = stats.get("rejected_count", 0) + 1
+                elif decision == "revision":
+                    update_data["revision_count"] = stats.get("revision_count", 0) + 1
+                
+                if has_conflict:
+                    update_data["conflict_count"] = stats.get("conflict_count", 0) + 1
+                
+                self.client.table("ai_daily_stats").update(update_data).eq("id", stats["id"]).execute()
+            else:
+                # Yeni kayıt oluştur
+                insert_data = {
+                    "stat_date": today,
+                    "total_forms_processed": 1,
+                    "avg_confidence_score": confidence,
+                    "estimated_cost_usd": cost,
+                    "approved_count": 1 if decision == "approved" else 0,
+                    "rejected_count": 1 if decision == "rejected" else 0,
+                    "revision_count": 1 if decision == "revision" else 0,
+                    "conflict_count": 1 if has_conflict else 0
+                }
+                self.client.table("ai_daily_stats").insert(insert_data).execute()
+                
+        except Exception as e:
+            logger.error(f"İstatistikler güncellenemedi: {e}")
+
+    def save_ai_evaluation(self, app_id: int, evaluation: dict) -> None:
+        """AI değerlendirmesini kaydet"""
+        try:
+            self.client.table("applications").update({
+                "ai_evaluation": evaluation,
+                "processed_by_ai": True
+            }).eq("id", app_id).execute()
+            logger.debug(f"AI değerlendirmesi kaydedildi: #{app_id}")
+        except Exception as e:
+            logger.error(f"AI değerlendirmesi kaydedilemedi: {e}")
+    
+    def lock_application(self, app_id: int, locked_by: str = "ai") -> None:
+        """Başvuruyu kilitle (onay/red sonrası)"""
+        try:
+            from datetime import datetime
+            self.client.table("applications").update({
+                "is_locked": True,
+                "locked_by": locked_by,
+                "locked_at": datetime.now().isoformat()
+            }).eq("id", app_id).execute()
+            logger.info(f"Başvuru kilitlendi: #{app_id} (by: {locked_by})")
+        except Exception as e:
+            logger.error(f"Başvuru kilitlenemedi: {e}")
+    
+    def unlock_application(self, app_id: int) -> None:
+        """Başvuru kilidini kaldır (super_admin için)"""
+        try:
+            self.client.table("applications").update({
+                "is_locked": False,
+                "locked_by": None,
+                "locked_at": None
+            }).eq("id", app_id).execute()
+            logger.info(f"Başvuru kilidi açıldı: #{app_id}")
+        except Exception as e:
+            logger.error(f"Başvuru kilidi açılamadı: {e}")

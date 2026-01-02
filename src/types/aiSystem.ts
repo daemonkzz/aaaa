@@ -15,6 +15,12 @@ export interface AISettings {
     auto_reject: boolean;
     revision_limit: number;
     daily_limit: number;
+    // Yeni alanlar
+    batch_interval: '30m' | '6h' | 'daily';
+    daily_batch_hour: number;
+    opus_arbiter_enabled: boolean;
+    cost_alert_threshold: number;
+    // Discord
     discord_bot_token?: string;
     discord_server_id?: string;
     discord_role_id?: string;
@@ -99,14 +105,18 @@ export interface AIAuditLog {
 
 // Günlük İstatistikler
 export interface AIDailyStats {
-    report_date: string;
-    total_processed: number;
+    id: number;
+    stat_date: string;
+    total_forms_processed: number;
     approved_count: number;
     rejected_count: number;
-    interview_count: number;
     revision_count: number;
-    avg_confidence: number;
-    avg_processing_time_ms: number;
+    conflict_count: number;
+    avg_confidence_score: number;
+    estimated_cost_usd: number;
+    deepseek_tokens_used: number;
+    opus_tokens_used: number;
+    created_at: string;
 }
 
 // AI Formu Gönderme Request
