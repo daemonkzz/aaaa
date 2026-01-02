@@ -129,10 +129,10 @@ class ClaudeClient:
         rp_questions: Dict[str, str],
         deepseek_analysis: Dict[str, Any],
         system_prompt: str,
-        model: str = "claude-sonnet-4-20250514"
+        model: str = "claude-opus-4-20250514"
     ) -> Tuple[Optional[Dict[str, Any]], int, int]:
         """
-        RP içeriğini değerlendir (Sonnet)
+        RP içeriğini değerlendir (Opus - Ana Model)
         Returns: (değerlendirme, input_tokens, output_tokens)
         """
         try:
@@ -167,7 +167,7 @@ Lütfen bu RP içeriğini değerlendir ve JSON formatında yanıt ver."""
             return evaluation, input_tokens, output_tokens
             
         except Exception as e:
-            logger.error(f"Claude Sonnet hatası: {e}")
+            logger.error(f"Claude Opus hatası: {e}")
             return None, 0, 0
     
     async def arbitrate(

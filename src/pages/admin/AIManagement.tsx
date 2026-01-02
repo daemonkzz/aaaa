@@ -16,7 +16,10 @@ import {
     Users,
     TrendingUp,
     Shield,
-    Zap
+    Zap,
+    DollarSign,
+    Timer,
+    Gavel
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -75,6 +78,10 @@ const AIManagementContent: React.FC = () => {
     // Temporary form state
     const [formData, setFormData] = useState<Partial<AISettings>>({});
     const [blacklistInput, setBlacklistInput] = useState('');
+
+    // Conflict forms state
+    const [conflictForms, setConflictForms] = useState<any[]>([]);
+    const [isLoadingConflicts, setIsLoadingConflicts] = useState(false);
 
     // Fetch AI Settings
     const fetchSettings = useCallback(async () => {
@@ -142,11 +149,31 @@ const AIManagementContent: React.FC = () => {
         }
     }, []);
 
+    // Fetch conflict forms
+    const fetchConflictForms = useCallback(async () => {
+        setIsLoadingConflicts(true);
+        try {
+            const { data, error } = await supabase
+                .from('applications')
+                .select('*, profiles(username)')
+                .in('ai_conflict_status', ['conflict_pending', 'conflict_admin'])
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setConflictForms(data || []);
+        } catch (error) {
+            console.error('Çatışmalı formlar alınamadı:', error);
+        } finally {
+            setIsLoadingConflicts(false);
+        }
+    }, []);
+
     useEffect(() => {
         fetchSettings();
         fetchReports();
         fetchStats();
-    }, [fetchSettings, fetchReports, fetchStats]);
+        fetchConflictForms();
+    }, [fetchSettings, fetchReports, fetchStats, fetchConflictForms]);
 
     // Save Settings
     const handleSave = async () => {
@@ -296,7 +323,7 @@ const AIManagementContent: React.FC = () => {
 
             {/* Tabs */}
             <Tabs defaultValue="settings" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="settings" className="flex items-center gap-2">
                         <Settings className="w-4 h-4" />
                         Ayarlar
@@ -304,6 +331,10 @@ const AIManagementContent: React.FC = () => {
                     <TabsTrigger value="reports" className="flex items-center gap-2">
                         <FileText className="w-4 h-4" />
                         Raporlar
+                    </TabsTrigger>
+                    <TabsTrigger value="conflicts" className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        Çatışmalı ({conflictForms.length})
                     </TabsTrigger>
                     <TabsTrigger value="stats" className="flex items-center gap-2">
                         <BarChart3 className="w-4 h-4" />
@@ -399,6 +430,71 @@ const AIManagementContent: React.FC = () => {
                                     </p>
                                 </div>
 
+                                {/* Batch Interval */}
+                                <div className="space-y-2">
+                                    <Label>Kontrol Aralığı</Label>
+                                    <Select
+                                        value={formData.batch_interval || '30m'}
+                                        onValueChange={(value) => setFormData({ ...formData, batch_interval: value })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="30m">
+                                                <div className="flex items-center gap-2">
+                                                    <Timer className="w-4 h-4" />
+                                                    30 Dakikada Bir
+                                                </div>
+                                            </SelectItem>
+                                            <SelectItem value="6h">
+                                                <div className="flex items-center gap-2">
+                                                    <Clock className="w-4 h-4" />
+                                                    6 Saatte Bir
+                                                </div>
+                                            </SelectItem>
+                                            <SelectItem value="daily">
+                                                <div className="flex items-center gap-2">
+                                                    <RefreshCw className="w-4 h-4" />
+                                                    Günlük (Belirlenen Saat)
+                                                </div>
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* Daily Hour (only for daily mode) */}
+                                {formData.batch_interval === 'daily' && (
+                                    <div className="space-y-2">
+                                        <Label>Günlük Çalışma Saati</Label>
+                                        <Input
+                                            type="number"
+                                            value={formData.daily_batch_hour || 3}
+                                            onChange={(e) => setFormData({ ...formData, daily_batch_hour: parseInt(e.target.value) })}
+                                            min={0}
+                                            max={23}
+                                        />
+                                        <p className="text-xs text-muted-foreground">0-23 arası saat</p>
+                                    </div>
+                                )}
+
+                                {/* Opus Arbiter Toggle */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <Label className="flex items-center gap-2">
+                                            <Gavel className="w-4 h-4" />
+                                            Opus Hakem
+                                        </Label>
+                                        <p className="text-xs text-muted-foreground">
+                                            Çatışmada Opus hakem olarak karar versin
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={formData.opus_arbiter_enabled || false}
+                                        onCheckedChange={(checked) => setFormData({ ...formData, opus_arbiter_enabled: checked })}
+                                    />
+                                </div>
+
                                 {/* Auto Actions */}
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
@@ -474,6 +570,25 @@ const AIManagementContent: React.FC = () => {
                                     />
                                     <p className="text-xs text-muted-foreground">
                                         Virgülle ayırarak yazın. Bu kelimeleri içeren başvurular flag'lenir.
+                                    </p>
+                                </div>
+
+                                {/* Cost Alert Threshold */}
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2">
+                                        <DollarSign className="w-4 h-4" />
+                                        Maliyet Uyarı Eşiği ($)
+                                    </Label>
+                                    <Input
+                                        type="number"
+                                        value={formData.cost_alert_threshold || 5}
+                                        onChange={(e) => setFormData({ ...formData, cost_alert_threshold: parseFloat(e.target.value) })}
+                                        min={1}
+                                        max={100}
+                                        step={0.5}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Günlük maliyet bu eşiği geçince Discord'dan uyarı gönderilir
                                     </p>
                                 </div>
 
@@ -556,6 +671,75 @@ const AIManagementContent: React.FC = () => {
                                                 </TableCell>
                                                 <TableCell className="text-xs text-muted-foreground">
                                                     {new Date(report.created_at).toLocaleString('tr-TR')}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* Conflicts Tab */}
+                <TabsContent value="conflicts">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <AlertTriangle className="w-5 h-5 text-amber-400" />
+                                    Çatışmalı Başvurular
+                                </CardTitle>
+                                <CardDescription>
+                                    DeepSeek ve Opus arasında uyuşmazlık olan başvurular
+                                </CardDescription>
+                            </div>
+                            <Button variant="outline" size="sm" onClick={fetchConflictForms} disabled={isLoadingConflicts}>
+                                {isLoadingConflicts ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <RefreshCw className="w-4 h-4" />
+                                )}
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            {conflictForms.length === 0 ? (
+                                <div className="text-center py-8 text-muted-foreground">
+                                    <CheckCircle className="w-12 h-12 mx-auto mb-4 text-emerald-400" />
+                                    <p>Çatışmalı başvuru bulunmamaktadır.</p>
+                                </div>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>ID</TableHead>
+                                            <TableHead>Kullanıcı</TableHead>
+                                            <TableHead>Durum</TableHead>
+                                            <TableHead>Tarih</TableHead>
+                                            <TableHead>İşlem</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {conflictForms.map((form) => (
+                                            <TableRow key={form.id}>
+                                                <TableCell className="font-mono text-xs">#{form.id}</TableCell>
+                                                <TableCell>{form.profiles?.username || 'Bilinmiyor'}</TableCell>
+                                                <TableCell>
+                                                    <Badge className="bg-amber-500/20 text-amber-400">
+                                                        {form.ai_conflict_status === 'conflict_admin' ? 'Admin Bekleniyor' : 'Hakem Bekleniyor'}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">
+                                                    {new Date(form.created_at).toLocaleString('tr-TR')}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => window.open(`/admin/basvuru/${form.id}`, '_blank')}
+                                                    >
+                                                        Detay
+                                                    </Button>
                                                 </TableCell>
                                             </TableRow>
                                         ))}

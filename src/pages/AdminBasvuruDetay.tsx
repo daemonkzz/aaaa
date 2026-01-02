@@ -47,6 +47,10 @@ interface ApplicationDetail {
     discord_id: string | null;
     steam_id: string | null;
   };
+  // Kilitleme alanları
+  is_locked?: boolean;
+  locked_by?: string;
+  processed_by_ai?: boolean;
   // AI evaluation fields
   ai_evaluation: AIEvaluation | null;
   ai_decision: AIDecision | null;
@@ -127,6 +131,7 @@ const AdminBasvuruDetay = () => {
   // AI send state
   const [isSendingToAI, setIsSendingToAI] = useState(false);
   const [aiPriority, setAIPriority] = useState(false);
+  const [isDryRunning, setIsDryRunning] = useState(false);
 
   // Get super admin status
   const { isSuperAdmin } = useUserPermissions();
@@ -272,7 +277,11 @@ const AdminBasvuruDetay = () => {
           status,
           admin_note: adminNote || null,
           revision_requested_fields: null,
-          revision_notes: null
+          revision_notes: null,
+          // Kilitleme - staff kararı sonrası
+          is_locked: true,
+          locked_by: 'staff',
+          locked_at: new Date().toISOString()
         })
         .eq('id', application.id);
 
@@ -356,6 +365,32 @@ const AdminBasvuruDetay = () => {
         ? prev.filter(k => k !== questionKey)
         : [...prev, questionKey]
     );
+  };
+
+  // Dry Run - AI değerlendirmesini test et, işlem yapma (super_admin only)
+  const handleDryRun = async () => {
+    if (!application) return;
+
+    setIsDryRunning(true);
+    try {
+      // Mark the application for dry run processing
+      const { error } = await supabase
+        .from('applications')
+        .update({
+          ai_dry_run: true,
+          ai_processing_status: 'queued'
+        })
+        .eq('id', application.id);
+
+      if (error) throw error;
+
+      toast.success('Dry run başlatıldı. AI değerlendirmesi yapılacak ama işlem yapılmayacak. Sonuç Discord\'a gönderilecek.');
+    } catch (error) {
+      console.error('Dry run error:', error);
+      toast.error('Dry run başlatılırken hata oluştu');
+    } finally {
+      setIsDryRunning(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -507,10 +542,10 @@ const AdminBasvuruDetay = () => {
                 </div>
                 {application.ai_decision && (
                   <Badge className={`text-sm ${application.ai_decision === 'approved'
-                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                      : application.ai_decision === 'rejected'
-                        ? 'bg-red-500/20 text-red-400 border-red-500/30'
-                        : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                    : application.ai_decision === 'rejected'
+                      ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                      : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
                     }`}>
                     {application.ai_decision === 'approved' && 'Onay Önerisi'}
                     {application.ai_decision === 'rejected' && 'Red Önerisi'}
@@ -529,8 +564,8 @@ const AdminBasvuruDetay = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className={`text-2xl font-bold ${application.ai_confidence_score >= 80 ? 'text-emerald-400' :
-                          application.ai_confidence_score >= 60 ? 'text-amber-400' :
-                            'text-red-400'
+                        application.ai_confidence_score >= 60 ? 'text-amber-400' :
+                          'text-red-400'
                         }`}>
                         {application.ai_confidence_score}%
                       </span>
@@ -538,8 +573,8 @@ const AdminBasvuruDetay = () => {
                     <Progress
                       value={application.ai_confidence_score}
                       className={`h-2 ${application.ai_confidence_score >= 80 ? '[&>div]:bg-emerald-500' :
-                          application.ai_confidence_score >= 60 ? '[&>div]:bg-amber-500' :
-                            '[&>div]:bg-red-500'
+                        application.ai_confidence_score >= 60 ? '[&>div]:bg-amber-500' :
+                          '[&>div]:bg-red-500'
                         }`}
                     />
                   </div>
@@ -547,8 +582,8 @@ const AdminBasvuruDetay = () => {
               </div>
             </div>
 
-            {/* AI Evaluation Details */}
-            {application.ai_evaluation && (
+            {/* AI Evaluation Details - super_admin only */}
+            {application.ai_evaluation && isSuperAdmin && (
               <div className="space-y-4">
                 {/* Player Profile */}
                 {application.ai_evaluation.player_profile && (
@@ -926,8 +961,8 @@ const AdminBasvuruDetay = () => {
         {/* Already processed message */}
         {!canTakeAction && (
           <div className={`p-4 rounded-lg text-center ${application.status === 'approved'
-              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-              : 'bg-red-500/10 text-red-400 border border-red-500/20'
+            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+            : 'bg-red-500/10 text-red-400 border border-red-500/20'
             }`}>
             <p>
               Bu başvuru {application.status === 'approved' ? 'onaylanmış' : 'reddedilmiş'} durumda.

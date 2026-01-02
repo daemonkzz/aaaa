@@ -1,13 +1,14 @@
 """
 Kaze AI System - Ana Daemon
-30 dakikada bir çalışan, başvuruları işleyen ana servis
+Ayarlanabilir aralıklarla çalışan, başvuruları işleyen ana servis
 """
 
 import os
 import sys
 import asyncio
 import signal
-from datetime import datetime, time
+from datetime import datetime, time, date
+from decimal import Decimal
 from dotenv import load_dotenv
 from loguru import logger
 
@@ -33,6 +34,14 @@ logger.add(
     level="DEBUG"
 )
 
+# Token başı maliyet (USD)
+COST_PER_1M_TOKENS = {
+    "deepseek_input": Decimal("0.55"),
+    "deepseek_output": Decimal("2.19"),
+    "opus_input": Decimal("5.00"),
+    "opus_output": Decimal("25.00"),
+}
+
 
 class KazeAIDaemon:
     """Ana AI işleme daemon'ı"""
@@ -44,6 +53,10 @@ class KazeAIDaemon:
         self.claude = ClaudeClient()
         self.discord = DiscordHandler()
         self.webhook = WebhookHandler()
+        
+        # Günlük maliyet takibi
+        self.daily_cost = Decimal("0")
+        self.cost_alert_sent = False
         
         # Prompt'ları yükle
         self.prompts = self._load_prompts()
@@ -57,8 +70,8 @@ class KazeAIDaemon:
         
         files = {
             "deepseek": "deepseek_system.txt",
-            "sonnet": "claude_sonnet_system.txt",
-            "opus": "claude_opus_system.txt"
+            "opus": "claude_opus_system.txt",  # Ana model artık Opus
+            "arbiter": "claude_opus_system.txt"  # Hakem de Opus (farklı prompt olabilir)
         }
         
         for key, filename in files.items():
@@ -72,6 +85,26 @@ class KazeAIDaemon:
         
         return prompts
     
+    def _get_check_interval(self, settings: dict) -> int:
+        """Ayarlardan check interval'ı al (saniye cinsinden)"""
+        batch_interval = settings.get("batch_interval", "30m")
+        daily_hour = settings.get("daily_batch_hour", 3)
+        
+        if batch_interval == "30m":
+            return 30 * 60  # 30 dakika
+        elif batch_interval == "6h":
+            return 6 * 60 * 60  # 6 saat
+        elif batch_interval == "daily":
+            # Günlük modda, belirlenen saate kadar bekle
+            now = datetime.now()
+            target = now.replace(hour=daily_hour, minute=0, second=0, microsecond=0)
+            if now >= target:
+                # Bugünkü saat geçtiyse yarına ayarla
+                target = target.replace(day=target.day + 1)
+            return int((target - now).total_seconds())
+        else:
+            return 30 * 60  # Varsayılan 30 dakika
+    
     async def start(self):
         """Daemon'ı başlat"""
         self.running = True
@@ -79,10 +112,11 @@ class KazeAIDaemon:
         # Discord bot'u başlat
         await self.discord.start()
         
-        # Graceful shutdown için signal handler
-        loop = asyncio.get_event_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, lambda: asyncio.create_task(self.stop()))
+        # Graceful shutdown için signal handler (sadece Unix'te)
+        if sys.platform != "win32":
+            loop = asyncio.get_event_loop()
+            for sig in (signal.SIGTERM, signal.SIGINT):
+                loop.add_signal_handler(sig, lambda: asyncio.create_task(self.stop()))
         
         logger.info("Daemon çalışmaya başladı")
         
@@ -98,11 +132,16 @@ class KazeAIDaemon:
     
     async def _main_loop(self):
         """Ana işleme döngüsü"""
-        check_interval = int(os.getenv("CHECK_INTERVAL_MINUTES", "30")) * 60
         restart_hour = int(os.getenv("DAILY_RESTART_HOUR", "4"))
         
         while self.running:
             try:
+                settings = self.db.get_ai_settings()
+                if not settings:
+                    logger.error("AI ayarları alınamadı, 5 dakika sonra tekrar denenecek")
+                    await asyncio.sleep(300)
+                    continue
+                
                 # Günlük restart kontrolü
                 now = datetime.now()
                 if now.hour == restart_hour and now.minute < 5:
@@ -110,29 +149,35 @@ class KazeAIDaemon:
                     await self.stop()
                     return
                 
+                # Gün değiştiyse maliyet sıfırla
+                if now.date() != getattr(self, '_last_date', None):
+                    self._last_date = now.date()
+                    self.daily_cost = Decimal("0")
+                    self.cost_alert_sent = False
+                
                 # Öncelikli başvuruları kontrol et
                 priority_apps = self.db.get_priority_applications()
                 if priority_apps:
                     logger.info(f"{len(priority_apps)} öncelikli başvuru bulundu")
                     for app in priority_apps:
-                        await self._process_application(app)
+                        await self._process_application(app, settings=settings)
                 
                 # Normal başvuruları işle
-                await self._process_batch()
+                await self._process_batch(settings)
                 
-                # Interval kadar bekle
+                # Check interval'ı ayarlardan al
+                check_interval = self._get_check_interval(settings)
                 logger.info(f"Sonraki kontrol: {check_interval // 60} dakika sonra")
                 await asyncio.sleep(check_interval)
                 
             except Exception as e:
                 logger.error(f"Ana döngü hatası: {e}")
-                await asyncio.sleep(60)  # Hata durumunda 1 dakika bekle
+                await self.webhook.send_alert("🔴 API Hatası", f"Daemon ana döngü hatası: {str(e)[:200]}")
+                await asyncio.sleep(60)
     
-    async def _process_batch(self):
+    async def _process_batch(self, settings: dict):
         """Batch işleme"""
-        settings = self.db.get_ai_settings()
-        
-        if not settings or not settings.get("is_enabled"):
+        if not settings.get("is_enabled"):
             logger.info("AI sistemi devre dışı")
             return
         
@@ -160,12 +205,20 @@ class KazeAIDaemon:
         logger.info(f"{len(applications)} başvuru işlenecek (mod: {mode})")
         
         for app in applications:
+            # PRE-CHECK: Staff zaten işlediyse atla
+            current_status = self.db.get_application_current_status(app["id"])
+            if current_status in ["approved", "rejected", "revision_requested"]:
+                logger.info(f"Başvuru #{app['id']} zaten staff tarafından işlenmiş, atlanıyor")
+                self.db.update_application_status(app["id"], "skipped")
+                continue
+            
             await self._process_application(app, mode, settings)
     
     async def _process_application(self, app: dict, mode: str = None, settings: dict = None):
         """Tek başvuruyu işle"""
         app_id = app["id"]
         start_time = datetime.now()
+        is_dry_run = app.get("ai_dry_run", False)
         
         try:
             # Ayarları al (eğer verilmediyse)
@@ -173,6 +226,10 @@ class KazeAIDaemon:
                 settings = self.db.get_ai_settings()
             if not mode:
                 mode = settings.get("mode", "readonly")
+            
+            # DRY RUN kontrolü
+            if is_dry_run:
+                logger.info(f"[DRY RUN] Başvuru #{app_id} test modunda işleniyor")
             
             # İşleniyor olarak işaretle
             self.db.update_application_status(app_id, "processing")
@@ -195,42 +252,71 @@ class KazeAIDaemon:
             deepseek_decision = deepseek_result.get("decision", "interview")
             logger.info(f"DeepSeek kararı: {deepseek_decision}")
             
-            # 2. AŞAMA: Claude Sonnet (RP soruları)
-            # TODO: Form template'den ai_skip olmayan soruları filtrele
-            rp_questions = content  # Şimdilik tüm içerik
+            # 2. AŞAMA: Claude Opus (Ana Model)
+            rp_questions = content
             
-            sonnet_result, sn_input, sn_output = await self.claude.evaluate_rp_content(
+            opus_result, op_input, op_output = await self.claude.evaluate_rp_content(
                 rp_questions,
                 deepseek_result,
-                self.prompts.get("sonnet", "")
+                self.prompts.get("opus", "")
             )
             
-            sonnet_decision = sonnet_result.get("recommendation", "interview") if sonnet_result else deepseek_decision
-            logger.info(f"Sonnet kararı: {sonnet_decision}")
+            opus_decision = opus_result.get("recommendation", "interview") if opus_result else deepseek_decision
+            logger.info(f"Opus kararı: {opus_decision}")
             
-            # 3. AŞAMA: Uyuşmazlık kontrolü
+            # 3. AŞAMA: Çatışma Kontrolü
             final_decision = deepseek_decision
-            opus_result = None
-            op_input, op_output = 0, 0
+            arbiter_result = None
+            arb_input, arb_output = 0, 0
+            conflict_status = None
             
-            if deepseek_decision != sonnet_decision:
-                logger.info("Uyuşmazlık tespit edildi, Opus hakemliği başlatılıyor...")
+            if deepseek_decision != opus_decision:
+                logger.info("Uyuşmazlık tespit edildi!")
                 
-                opus_result, op_input, op_output = await self.claude.arbitrate(
-                    content,
-                    deepseek_decision,
-                    sonnet_decision,
-                    deepseek_result,
-                    sonnet_result,
-                    self.prompts.get("opus", "")
+                opus_arbiter_enabled = settings.get("opus_arbiter_enabled", False)
+                
+                if opus_arbiter_enabled:
+                    # Opus hakem olarak çağır
+                    logger.info("Opus hakemliği başlatılıyor...")
+                    arbiter_result, arb_input, arb_output = await self.claude.arbitrate(
+                        content,
+                        deepseek_decision,
+                        opus_decision,
+                        deepseek_result,
+                        opus_result,
+                        self.prompts.get("arbiter", "")
+                    )
+                    
+                    if arbiter_result:
+                        final_decision = arbiter_result.get("final_decision", "interview")
+                        conflict_status = "conflict_resolved"
+                        logger.info(f"Hakem kararı: {final_decision}")
+                else:
+                    # Admin'e bırak
+                    conflict_status = "conflict_admin"
+                    final_decision = "interview"  # Varsayılan olarak mülakata yönlendir
+                    logger.info("Çatışma admin'e yönlendiriliyor")
+                    
+                    await self.webhook.send_alert(
+                        "⚠️ Çatışmalı Başvuru",
+                        f"Başvuru #{app_id}\nDeepSeek: {deepseek_decision}\nOpus: {opus_decision}\nAdmin kararı bekleniyor"
+                    )
+            
+            # Maliyet hesapla
+            cost = self._calculate_cost(ds_input, ds_output, op_input + arb_input, op_output + arb_output)
+            self.daily_cost += cost
+            
+            # Maliyet uyarısı kontrolü
+            threshold = Decimal(str(settings.get("cost_alert_threshold", 5.0)))
+            if self.daily_cost >= threshold and not self.cost_alert_sent:
+                await self.webhook.send_alert(
+                    "💰 Maliyet Uyarısı",
+                    f"Günlük maliyet eşiği aşıldı: ${self.daily_cost:.2f} (eşik: ${threshold})"
                 )
-                
-                if opus_result:
-                    final_decision = opus_result.get("final_decision", "interview")
-                    logger.info(f"Opus final kararı: {final_decision}")
+                self.cost_alert_sent = True
             
             # Güven skoru hesapla
-            confidence = self._calculate_confidence(deepseek_result, sonnet_result, opus_result)
+            confidence = self._calculate_confidence(deepseek_result, opus_result, arbiter_result)
             
             # İşlem süresini hesapla
             processing_time = int((datetime.now() - start_time).total_seconds() * 1000)
@@ -238,28 +324,64 @@ class KazeAIDaemon:
             # Rapor oluştur
             report = {
                 "application_id": app_id,
-                "mode": mode,
+                "mode": "dry_run" if is_dry_run else mode,
                 "deepseek_analysis": deepseek_result,
-                "claude_analysis": sonnet_result,
+                "claude_analysis": opus_result,
                 "final_decision": final_decision,
                 "confidence_score": confidence,
                 "processing_time_ms": processing_time
             }
             
-            # Moda göre aksiyon al
-            action_taken = await self._take_action(app, final_decision, confidence, mode, settings)
-            report["action_taken"] = action_taken
+            # DRY RUN ise aksiyon alma
+            if is_dry_run:
+                report["action_taken"] = "dry_run_no_action"
+                self.db.update_application_status(app_id, "done")
+                # Dry run flag'ını kaldır
+                self.db.update_application_dry_run(app_id, False)
+            else:
+                # Moda göre aksiyon al
+                action_taken = await self._take_action(app, final_decision, confidence, mode, settings)
+                report["action_taken"] = action_taken
+                
+                # Çatışma durumunu güncelle
+                if conflict_status:
+                    self.db.update_application_conflict_status(app_id, conflict_status)
             
             # Raporu kaydet
             self.db.create_ai_report(report)
             
+            # AI Değerlendirmesini kaydet (yeni özellik)
+            ai_evaluation = {
+                "deepseek_analysis": deepseek_result.get("analysis", "") if deepseek_result else "",
+                "opus_evaluation": opus_result.get("evaluation", "") if opus_result else "",
+                "decision": final_decision,
+                "confidence_score": confidence,
+                "evaluated_at": datetime.now().isoformat(),
+                "arbiter_used": arbiter_result is not None
+            }
+            self.db.save_ai_evaluation(app_id, ai_evaluation)
+            
             # Başvuru durumunu güncelle
-            self.db.update_application_status(app_id, "done")
+            if not is_dry_run:
+                self.db.update_application_status(app_id, "done")
+                
+                # Kilitle - sadece karar verilmişse (onay/red)
+                if final_decision in ["approve", "reject"]:
+                    self.db.lock_application(app_id, "ai")
+            
+            # İstatistikleri güncelle
+            self.db.update_daily_stats(
+                final_decision, 
+                confidence, 
+                float(cost),
+                has_conflict=(conflict_status is not None)
+            )
             
             logger.info(f"Başvuru #{app_id} tamamlandı: {final_decision} (güven: %{confidence})")
             
         except Exception as e:
             logger.error(f"Başvuru #{app_id} işlenirken hata: {e}")
+            await self.webhook.send_alert("🔴 İşlem Hatası", f"Başvuru #{app_id}: {str(e)[:200]}")
             self.db.update_application_status(app_id, "error")
             self.db.create_ai_report({
                 "application_id": app_id,
@@ -268,16 +390,25 @@ class KazeAIDaemon:
                 "error_log": str(e)
             })
     
-    def _calculate_confidence(self, deepseek: dict, sonnet: dict, opus: dict = None) -> int:
+    def _calculate_cost(self, ds_input: int, ds_output: int, opus_input: int, opus_output: int) -> Decimal:
+        """Token kullanımından maliyet hesapla"""
+        cost = Decimal("0")
+        cost += (Decimal(ds_input) / 1000000) * COST_PER_1M_TOKENS["deepseek_input"]
+        cost += (Decimal(ds_output) / 1000000) * COST_PER_1M_TOKENS["deepseek_output"]
+        cost += (Decimal(opus_input) / 1000000) * COST_PER_1M_TOKENS["opus_input"]
+        cost += (Decimal(opus_output) / 1000000) * COST_PER_1M_TOKENS["opus_output"]
+        return cost
+    
+    def _calculate_confidence(self, deepseek: dict, opus: dict, arbiter: dict = None) -> int:
         """Güven skorunu hesapla"""
         scores = []
         
         if deepseek:
             scores.append(deepseek.get("overall_score", 50))
-        if sonnet:
-            scores.append(sonnet.get("confidence", 50))
         if opus:
             scores.append(opus.get("confidence", 50))
+        if arbiter:
+            scores.append(arbiter.get("confidence", 50))
         
         if not scores:
             return 50
@@ -331,7 +462,6 @@ class KazeAIDaemon:
         
         # REVİZYON
         elif decision == "revision":
-            # TODO: Revizyon alanlarını belirle
             self.db.request_revision(app_id, [], {"general": "AI tarafından revizyon istendi"})
             return "revision_sent"
         
