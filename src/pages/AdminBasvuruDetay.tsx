@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,7 +21,8 @@ import {
   TrendingUp,
   AlertCircle,
   Send,
-  Sparkles
+  Sparkles,
+  RotateCcw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -136,6 +137,9 @@ const AdminBasvuruDetay = () => {
   // Get super admin status
   const { isSuperAdmin } = useUserPermissions();
 
+  // Form template for question ordering
+  const [formTemplate, setFormTemplate] = useState<{ questions: Array<{ id: string; label: string; pageId?: string }>; settings?: { pages?: Array<{ id: string; title: string }> } } | null>(null);
+
   useEffect(() => {
     const checkAdminRole = async () => {
       if (authLoading) return;
@@ -222,6 +226,22 @@ const AdminBasvuruDetay = () => {
           ai_evaluated_at: data.ai_evaluated_at
         });
         setAdminNote(data.admin_note || '');
+
+        // Fetch form template for question ordering
+        if (data.type) {
+          const { data: templateData } = await supabase
+            .from('form_templates')
+            .select('questions, settings')
+            .eq('id', data.type)
+            .maybeSingle();
+
+          if (templateData) {
+            setFormTemplate({
+              questions: templateData.questions as Array<{ id: string; label: string; pageId?: string }>,
+              settings: templateData.settings as { pages?: Array<{ id: string; title: string }> }
+            });
+          }
+        }
       } catch (error) {
         console.error('Fetch error:', error);
         toast.error('Başvuru yüklenirken hata oluştu');
@@ -234,6 +254,31 @@ const AdminBasvuruDetay = () => {
       fetchApplication();
     }
   }, [isAuthorized, id, navigate]);
+
+  // Sort content entries by form template question order
+  const sortedContentEntries = useMemo(() => {
+    if (!application?.content) return [];
+
+    const contentEntries = Object.entries(application.content);
+
+    if (!formTemplate?.questions?.length) {
+      // Fallback: return as-is if no template
+      return contentEntries;
+    }
+
+    // Create a map of question label -> sort order
+    const orderMap = new Map<string, number>();
+    formTemplate.questions.forEach((q, index) => {
+      orderMap.set(q.label, index);
+    });
+
+    // Sort by the template order
+    return contentEntries.sort((a, b) => {
+      const orderA = orderMap.get(a[0]) ?? 9999;
+      const orderB = orderMap.get(b[0]) ?? 9999;
+      return orderA - orderB;
+    });
+  }, [application?.content, formTemplate?.questions]);
 
   // Bildirim gönderme yardımcı fonksiyonu
   const sendNotification = async (userId: string, title: string, content: string) => {
@@ -313,6 +358,37 @@ const AdminBasvuruDetay = () => {
     } catch (error) {
       console.error('Update error:', error);
       toast.error('Durum güncellenirken hata oluştu');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Reset to pending - başvuruyu işlem yapılmamış durumuna döndür
+  const resetToPending = async () => {
+    if (!application) return;
+
+    setIsUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('applications')
+        .update({
+          status: 'pending',
+          is_locked: false,
+          locked_by: null,
+          locked_at: null,
+          admin_note: null,
+          ai_processing_status: null
+        })
+        .eq('id', application.id);
+
+      if (error) throw error;
+
+      toast.success('Başvuru beklemede durumuna alındı');
+      // Sayfayı yenile
+      window.location.reload();
+    } catch (error) {
+      console.error('Reset error:', error);
+      toast.error('Durum sıfırlanırken hata oluştu');
     } finally {
       setIsUpdating(false);
     }
@@ -733,7 +809,7 @@ const AdminBasvuruDetay = () => {
             Başvuru İçeriği
           </h2>
           <div className="space-y-6">
-            {Object.entries(application.content).map(([key, value]) => {
+            {sortedContentEntries.map(([key, value]) => {
               const oldValue = getOldValue(key);
               const valueChanged = hasValueChanged(key);
               const isSelected = selectedForRevision.includes(key);
@@ -902,11 +978,17 @@ const AdminBasvuruDetay = () => {
             {!isRevisionMode && (
               <div className="space-y-4">
                 {/* Approve Confirmation */}
-                <div className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                <div className={`flex items-center gap-3 p-4 rounded-lg transition-all ${confirmApprove
+                  ? 'bg-emerald-500/20 border-2 border-emerald-500/50'
+                  : 'bg-emerald-500/10 border border-emerald-500/20'
+                  }`}>
                   <Checkbox
                     id="confirm-approve"
                     checked={confirmApprove}
-                    onCheckedChange={(checked) => setConfirmApprove(checked as boolean)}
+                    onCheckedChange={(checked) => {
+                      setConfirmApprove(checked as boolean);
+                      if (checked) setConfirmReject(false); // Diğerini kapat
+                    }}
                   />
                   <Label htmlFor="confirm-approve" className="text-sm text-foreground cursor-pointer">
                     Bu başvuruyu onayladığımı ve kullanıcının whitelist'e ekleneceğini kabul ediyorum
@@ -914,11 +996,17 @@ const AdminBasvuruDetay = () => {
                 </div>
 
                 {/* Reject Confirmation */}
-                <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <div className={`flex items-center gap-3 p-4 rounded-lg transition-all ${confirmReject
+                  ? 'bg-red-500/20 border-2 border-red-500/50'
+                  : 'bg-red-500/10 border border-red-500/20'
+                  }`}>
                   <Checkbox
                     id="confirm-reject"
                     checked={confirmReject}
-                    onCheckedChange={(checked) => setConfirmReject(checked as boolean)}
+                    onCheckedChange={(checked) => {
+                      setConfirmReject(checked as boolean);
+                      if (checked) setConfirmApprove(false); // Diğerini kapat
+                    }}
                   />
                   <Label htmlFor="confirm-reject" className="text-sm text-foreground cursor-pointer">
                     Bu başvuruyu reddettiğimi onaylıyorum
@@ -928,9 +1016,9 @@ const AdminBasvuruDetay = () => {
                 <div className="flex flex-col sm:flex-row gap-4">
                   <Button
                     size="lg"
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => updateStatus('approved')}
-                    disabled={isUpdating || !confirmApprove}
+                    disabled={isUpdating || !confirmApprove || confirmReject}
                   >
                     {isUpdating ? (
                       <Loader2 className="w-5 h-5 animate-spin mr-2" />
@@ -942,9 +1030,9 @@ const AdminBasvuruDetay = () => {
                   <Button
                     size="lg"
                     variant="destructive"
-                    className="flex-1 disabled:opacity-50"
+                    className="flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => updateStatus('rejected')}
-                    disabled={isUpdating || !confirmReject}
+                    disabled={isUpdating || !confirmReject || confirmApprove}
                   >
                     {isUpdating ? (
                       <Loader2 className="w-5 h-5 animate-spin mr-2" />
@@ -954,6 +1042,24 @@ const AdminBasvuruDetay = () => {
                     Başvuruyu Reddet
                   </Button>
                 </div>
+
+                {/* Reset to Pending Button - sadece işlem yapılmışsa göster */}
+                {(application.status === 'approved' || application.status === 'rejected') && (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="w-full mt-4 border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
+                    onClick={resetToPending}
+                    disabled={isUpdating}
+                  >
+                    {isUpdating ? (
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    ) : (
+                      <RotateCcw className="w-5 h-5 mr-2" />
+                    )}
+                    Beklemede'ye Al
+                  </Button>
+                )}
               </div>
             )}
           </div>

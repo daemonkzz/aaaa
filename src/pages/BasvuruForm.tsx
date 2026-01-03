@@ -794,25 +794,99 @@ const BasvuruForm = () => {
                 </div>
               </div>
 
-              {/* Progress Bar */}
+              {/* Progress Bar - 4 Segmentli */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
                 className="bg-card/40 backdrop-blur-sm border border-border/30 rounded-xl p-4"
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-3">
                   <span className="text-sm text-muted-foreground">Form Tamamlanma Durumu</span>
                   <span className={`text-sm font-medium ${progress === 100 ? 'text-primary' : 'text-foreground'}`}>
                     {progress}%
                   </span>
                 </div>
-                <Progress
-                  value={progress}
-                  className="h-2 bg-muted/50 [&>div]:bg-gradient-to-r [&>div]:from-primary [&>div]:to-primary/70"
-                />
+
+                {/* 4 Segment Progress */}
+                <div className="flex items-center gap-1">
+                  {pages.length > 0 ? (
+                    // Sayfa bazlı segmentler
+                    pages.map((page, idx) => {
+                      const pageQuestions = sortedQuestions.filter(q => q.pageId === page.id);
+                      const pageFilledCount = pageQuestions.filter(q => {
+                        const val = formData[q.id];
+                        if (Array.isArray(val)) return val.length > 0;
+                        return val && val.toString().trim() !== '';
+                      }).length;
+                      const pageRequiredCount = pageQuestions.filter(q => q.required).length;
+                      const pageProgress = pageRequiredCount > 0
+                        ? Math.round((pageQuestions.filter(q => {
+                          if (!q.required) return false;
+                          const val = formData[q.id];
+                          if (Array.isArray(val)) return val.length > 0;
+                          return val && val.toString().trim() !== '';
+                        }).length / pageRequiredCount) * 100)
+                        : 100;
+                      const isCompleted = idx < currentPageIndex || (idx === currentPageIndex && pageProgress === 100);
+                      const isCurrent = idx === currentPageIndex;
+
+                      return (
+                        <div
+                          key={page.id}
+                          className="flex-1 h-3 rounded-full overflow-hidden bg-muted/50 relative"
+                        >
+                          <motion.div
+                            className={`h-full ${isCompleted ? 'bg-primary' : isCurrent ? 'bg-primary/70' : 'bg-muted'}`}
+                            initial={{ width: 0 }}
+                            animate={{
+                              width: isCompleted ? '100%' : isCurrent ? `${pageProgress}%` : '0%'
+                            }}
+                            transition={{ duration: 0.3, ease: 'easeOut' }}
+                          />
+                          {/* Segment label */}
+                          {isCompleted && (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="absolute inset-0 flex items-center justify-center"
+                            >
+                              <CheckCircle2 className="w-2.5 h-2.5 text-primary-foreground" />
+                            </motion.div>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    // Fallback: tek progress bar
+                    <div className="flex-1 h-3 rounded-full overflow-hidden bg-muted/50">
+                      <motion.div
+                        className="h-full bg-gradient-to-r from-primary to-primary/70"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progress}%` }}
+                        transition={{ duration: 0.3, ease: 'easeOut' }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Page indicators */}
+                {pages.length > 0 && (
+                  <div className="flex justify-between mt-2">
+                    {pages.map((page, idx) => (
+                      <span
+                        key={page.id}
+                        className={`text-[10px] ${idx === currentPageIndex ? 'text-primary font-medium' : 'text-muted-foreground'}`}
+                      >
+                        {idx + 1}. {page.title.length > 10 ? page.title.slice(0, 10) + '...' : page.title}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 <p className="text-xs text-muted-foreground mt-2">
-                  {formTemplate.questions.length} soru · {formTemplate.questions.filter(q => q.required).length} zorunlu
+                  {sortedQuestions.length} soru · {sortedQuestions.filter(q => q.required).length} zorunlu
+                  {pages.length > 0 && ` · Bölüm ${currentPageIndex + 1}/${pages.length}`}
                 </p>
               </motion.div>
 

@@ -803,35 +803,17 @@ const Admin = () => {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                              {/* Görüntüle butonu */}
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300"
-                                onClick={() => updateApplicationStatus(app.id, 'approved')}
-                                disabled={updatingId === app.id || app.status === 'approved' || (app.is_locked && !isSuperAdmin)}
+                                className="bg-primary/10 border-primary/30 text-primary hover:bg-primary/20"
+                                onClick={() => navigate(`/admin/basvuru/${app.id}`)}
                               >
-                                {updatingId === app.id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Check className="w-4 h-4" />
-                                )}
-                                <span className="ml-1">Onayla</span>
+                                <Eye className="w-4 h-4" />
+                                <span className="ml-1">Görüntüle</span>
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300"
-                                onClick={() => updateApplicationStatus(app.id, 'rejected')}
-                                disabled={updatingId === app.id || app.status === 'rejected' || (app.is_locked && !isSuperAdmin)}
-                              >
-                                {updatingId === app.id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <X className="w-4 h-4" />
-                                )}
-                                <span className="ml-1">Reddet</span>
-                              </Button>
-                              {/* Kuyruğundan Çıkar - super_admin, only for queued items */}
+                              {/* Kuyruktan Çıkar - super_admin, only for queued items */}
                               {isSuperAdmin && (app.ai_processing_status === 'queued') && (
                                 <Button
                                   size="sm"
