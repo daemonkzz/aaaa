@@ -289,7 +289,17 @@ const BasvuruForm = () => {
     if (!pages.length) return sortedQuestions;
     const currentPage = pages[currentPageIndex];
     if (!currentPage) return [];
-    return sortedQuestions.filter(q => q.pageId === currentPage.id);
+
+    // Mevcut sayfaya ait soruları al
+    const pageQuestions = sortedQuestions.filter(q => q.pageId === currentPage.id);
+
+    // Son sayfadaysak, pageId'si olmayan (orphan) soruları da ekle
+    if (currentPageIndex === pages.length - 1) {
+      const orphanQuestions = sortedQuestions.filter(q => !q.pageId || !pages.some(p => p.id === q.pageId));
+      return [...pageQuestions, ...orphanQuestions];
+    }
+
+    return pageQuestions;
   }, [sortedQuestions, pages, currentPageIndex]);
 
   // Mevcut sayfa valid mi?

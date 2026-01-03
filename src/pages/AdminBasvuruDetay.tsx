@@ -522,7 +522,8 @@ const AdminBasvuruDetay = () => {
     return null;
   }
 
-  const canTakeAction = application.status === 'pending' || application.status === 'revision_requested';
+  // Super admin her zaman işlem yapabilir, diğerleri sadece pending veya revision_requested durumundaki formlara
+  const canTakeAction = isSuperAdmin || application.status === 'pending' || application.status === 'revision_requested';
 
   return (
     <div className="min-h-screen bg-background">
