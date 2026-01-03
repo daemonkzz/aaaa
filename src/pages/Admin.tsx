@@ -262,14 +262,15 @@ const Admin = () => {
   const updateApplicationStatus = async (id: number, status: 'approved' | 'rejected') => {
     setUpdatingId(id);
     try {
-      // Status ve kilitleme birlikte güncelle
+      // Status ve kilitleme birlikte güncelle, AI kuyruğundan çıkar
       const { error } = await supabase
         .from('applications')
         .update({
           status,
           is_locked: true,
           locked_by: 'staff',
-          locked_at: new Date().toISOString()
+          locked_at: new Date().toISOString(),
+          ai_processing_status: null  // Kuyruktaysa çıkar
         })
         .eq('id', id);
 

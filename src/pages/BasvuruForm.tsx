@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Send, Loader2, AlertCircle, Lock, KeyRound, CheckCircle2, Sparkles, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Send, Loader2, AlertCircle, Lock, KeyRound, CheckCircle2, Sparkles, Save, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useToast } from "@/hooks/use-toast";
@@ -57,6 +57,9 @@ const BasvuruForm = () => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
 
+  // Sayfalama state'i
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+
   // localStorage key - unique per user and form
   const draftKey = user && formId ? `form_draft_${user.id}_${formId}` : null;
 
@@ -89,7 +92,7 @@ const BasvuruForm = () => {
             settings: data.settings as FormSettings
           };
           setFormTemplate(template);
-          
+
           if (!template.settings?.isPasswordProtected) {
             setIsCodeVerified(true);
           }
@@ -127,17 +130,17 @@ const BasvuruForm = () => {
   // Save draft function
   const saveDraft = () => {
     if (!draftKey) return;
-    
+
     const now = new Date();
-    
+
     localStorage.setItem(draftKey, JSON.stringify({
       data: formData,
       savedAt: now.toISOString()
     }));
-    
+
     setLastSaved(now);
     setJustSaved(true);
-    
+
     toast({
       title: "Cevaplar Kaydedildi",
       description: "Cevaplarınız başarıyla kaydedildi.",
@@ -152,13 +155,13 @@ const BasvuruForm = () => {
   // Clear form function
   const clearForm = () => {
     if (!draftKey) return;
-    
+
     localStorage.removeItem(draftKey);
     setFormData({});
     setLastSaved(null);
     setShowClearConfirm(false);
     setJustSaved(false);
-    
+
     toast({
       title: "Form Temizlendi",
       description: "Tüm cevaplarınız silindi.",
@@ -175,9 +178,9 @@ const BasvuruForm = () => {
   // Verify code via secure database function
   const handleCodeSubmit = async () => {
     if (!formId) return;
-    
+
     const trimmedCode = accessCode.trim();
-    
+
     try {
       const { data, error } = await supabase.rpc('verify_form_access_code', {
         p_form_id: formId,
@@ -229,7 +232,7 @@ const BasvuruForm = () => {
 
   const isFormValid = () => {
     if (!formTemplate) return false;
-    
+
     return formTemplate.questions.every(question => {
       if (!question.required) return true;
       const value = formData[question.id];
@@ -245,16 +248,76 @@ const BasvuruForm = () => {
     if (!formTemplate) return 0;
     const totalRequired = formTemplate.questions.filter(q => q.required).length;
     if (totalRequired === 0) return 100;
-    
+
     const filledRequired = formTemplate.questions.filter(q => {
       if (!q.required) return false;
       const value = formData[q.id];
       if (Array.isArray(value)) return value.length > 0;
       return value && value.toString().trim() !== '';
     }).length;
-    
+
     return Math.round((filledRequired / totalRequired) * 100);
   };
+
+  // Sayfalar ve sıralı sorular
+  const pages = useMemo(() => {
+    if (!formTemplate?.settings?.pages) return [];
+    return formTemplate.settings.pages;
+  }, [formTemplate]);
+
+  // Soruları sayfa sırasına göre sırala
+  const sortedQuestions = useMemo(() => {
+    if (!formTemplate) return [];
+    if (!pages.length) return formTemplate.questions;
+
+    // Her sayfa için soruları bul ve sırala
+    const sorted: FormQuestion[] = [];
+    pages.forEach(page => {
+      const pageQuestions = formTemplate.questions.filter(q => q.pageId === page.id);
+      sorted.push(...pageQuestions);
+    });
+
+    // pageId'si olmayan sorular varsa sona ekle
+    const orphanQuestions = formTemplate.questions.filter(q => !pages.some(p => p.id === q.pageId));
+    sorted.push(...orphanQuestions);
+
+    return sorted;
+  }, [formTemplate, pages]);
+
+  // Mevcut sayfadaki sorular
+  const currentPageQuestions = useMemo(() => {
+    if (!pages.length) return sortedQuestions;
+    const currentPage = pages[currentPageIndex];
+    if (!currentPage) return [];
+    return sortedQuestions.filter(q => q.pageId === currentPage.id);
+  }, [sortedQuestions, pages, currentPageIndex]);
+
+  // Mevcut sayfa valid mi?
+  const isCurrentPageValid = useMemo(() => {
+    return currentPageQuestions.every(question => {
+      if (!question.required) return true;
+      const value = formData[question.id];
+      if (Array.isArray(value)) return value.length > 0;
+      return value && value.toString().trim() !== '';
+    });
+  }, [currentPageQuestions, formData]);
+
+  // Sayfa navigasyonu
+  const goToNextPage = () => {
+    if (currentPageIndex < pages.length - 1) {
+      setCurrentPageIndex(prev => prev + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const goToPrevPage = () => {
+    if (currentPageIndex > 0) {
+      setCurrentPageIndex(prev => prev - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const isLastPage = currentPageIndex === pages.length - 1 || pages.length === 0;
 
   const handleSubmit = async () => {
     if (!user) {
@@ -287,8 +350,9 @@ const BasvuruForm = () => {
     setIsSubmitting(true);
 
     try {
+      // Soruları sıralı şekilde gönder
       const formattedContent: Record<string, string> = {};
-      formTemplate.questions.forEach(question => {
+      sortedQuestions.forEach(question => {
         const value = formData[question.id];
         const formattedValue = Array.isArray(value) ? value.join(', ') : (value || '');
         formattedContent[question.label || question.id] = formattedValue;
@@ -345,8 +409,8 @@ const BasvuruForm = () => {
       >
         <div className={`
           relative p-6 rounded-xl border transition-all duration-300
-          ${isFilled 
-            ? 'bg-primary/5 border-primary/20 shadow-[0_0_20px_-8px_hsl(var(--primary)/0.3)]' 
+          ${isFilled
+            ? 'bg-primary/5 border-primary/20 shadow-[0_0_20px_-8px_hsl(var(--primary)/0.3)]'
             : 'bg-card/40 border-border/30 hover:border-border/50 hover:bg-card/60'
           }
         `}>
@@ -354,8 +418,8 @@ const BasvuruForm = () => {
           <div className="absolute -top-3 -left-1">
             <span className={`
               inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold
-              ${isFilled 
-                ? 'bg-primary text-primary-foreground' 
+              ${isFilled
+                ? 'bg-primary text-primary-foreground'
                 : 'bg-muted border border-border text-muted-foreground'
               }
             `}>
@@ -405,9 +469,11 @@ const BasvuruForm = () => {
             {question.type === 'number' && (
               <Input
                 type="number"
+                min={18}
+                max={99}
                 value={(value as string) || ''}
                 onChange={(e) => updateField(question.id, e.target.value)}
-                placeholder={question.placeholder || 'Sayı girin...'}
+                placeholder={question.placeholder || 'Yaşınızı girin...'}
                 className="bg-background/50 border-border/40 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200 h-12 max-w-[200px]"
               />
             )}
@@ -415,7 +481,13 @@ const BasvuruForm = () => {
             {question.type === 'discord_id' && (
               <Input
                 value={(value as string) || ''}
-                onChange={(e) => updateField(question.id, e.target.value)}
+                onChange={(e) => {
+                  // Sadece sayı girişine izin ver
+                  const numericValue = e.target.value.replace(/\D/g, '');
+                  updateField(question.id, numericValue);
+                }}
+                maxLength={19}
+                pattern="[0-9]{17,19}"
                 placeholder={question.placeholder || 'Örn: 123456789012345678'}
                 className="bg-background/50 border-border/40 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200 h-12 max-w-[320px] font-mono"
               />
@@ -435,8 +507,8 @@ const BasvuruForm = () => {
                     transition={{ delay: 0.15 + index * 0.08 + optionIndex * 0.03 }}
                     className={`
                       flex items-center space-x-3 p-4 rounded-lg border transition-all duration-200 cursor-pointer
-                      ${value === option 
-                        ? 'bg-primary/10 border-primary/40' 
+                      ${value === option
+                        ? 'bg-primary/10 border-primary/40'
                         : 'bg-background/30 border-border/30 hover:border-primary/30 hover:bg-primary/5'
                       }
                     `}
@@ -466,8 +538,8 @@ const BasvuruForm = () => {
                       transition={{ delay: 0.15 + index * 0.08 + optionIndex * 0.03 }}
                       className={`
                         flex items-center space-x-3 p-4 rounded-lg border transition-all duration-200 cursor-pointer
-                        ${isChecked 
-                          ? 'bg-primary/10 border-primary/40' 
+                        ${isChecked
+                          ? 'bg-primary/10 border-primary/40'
                           : 'bg-background/30 border-border/30 hover:border-primary/30 hover:bg-primary/5'
                         }
                       `}
@@ -538,7 +610,7 @@ const BasvuruForm = () => {
           <div className="text-center space-y-4">
             <h1 className="text-2xl font-display text-foreground">Giriş Yapmalısınız</h1>
             <p className="text-muted-foreground">Başvuru yapabilmek için önce giriş yapmanız gerekmektedir.</p>
-            <Link 
+            <Link
               to="/"
               className="inline-block px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
             >
@@ -611,9 +683,8 @@ const BasvuruForm = () => {
                         if (e.key === 'Enter') handleCodeSubmit();
                       }}
                       placeholder="Erişim kodunuzu girin"
-                      className={`bg-background/50 border-border/40 pl-10 h-12 ${
-                        codeError ? 'border-destructive' : ''
-                      }`}
+                      className={`bg-background/50 border-border/40 pl-10 h-12 ${codeError ? 'border-destructive' : ''
+                        }`}
                     />
                   </div>
                   {codeError && (
@@ -663,7 +734,7 @@ const BasvuruForm = () => {
       {/* Background */}
       <div className="fixed inset-0 hero-gradient pointer-events-none z-[0]" />
       <div className="fixed top-1/3 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-primary/3 rounded-full blur-[150px] pointer-events-none z-[0]" />
-      
+
       <Header />
 
       <main className="flex-1 pt-28 pb-24 relative z-10">
@@ -687,8 +758,8 @@ const BasvuruForm = () => {
             {/* Cover Image */}
             {formTemplate.cover_image_url && (
               <div className="w-full h-48 md:h-64 rounded-2xl overflow-hidden mb-8 border border-border/30">
-                <img 
-                  src={formTemplate.cover_image_url} 
+                <img
+                  src={formTemplate.cover_image_url}
                   alt={formTemplate.title}
                   className="w-full h-full object-cover"
                 />
@@ -699,7 +770,7 @@ const BasvuruForm = () => {
             <div className="space-y-4">
               <div className="flex items-start gap-4">
                 <div className="flex-1">
-                  <motion.h1 
+                  <motion.h1
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
@@ -708,7 +779,7 @@ const BasvuruForm = () => {
                     {formTemplate.title}
                   </motion.h1>
                   {formTemplate.description && (
-                    <motion.p 
+                    <motion.p
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.15 }}
@@ -736,8 +807,8 @@ const BasvuruForm = () => {
                     {progress}%
                   </span>
                 </div>
-                <Progress 
-                  value={progress} 
+                <Progress
+                  value={progress}
                   className="h-2 bg-muted/50 [&>div]:bg-gradient-to-r [&>div]:from-primary [&>div]:to-primary/70"
                 />
                 <p className="text-xs text-muted-foreground mt-2">
@@ -767,11 +838,10 @@ const BasvuruForm = () => {
                       size="sm"
                       onClick={saveDraft}
                       disabled={!hasFormData || justSaved}
-                      className={`border-primary/30 transition-all duration-300 ${
-                        justSaved 
-                          ? 'bg-primary/10 text-primary border-primary/50' 
-                          : 'text-primary hover:bg-primary/10'
-                      }`}
+                      className={`border-primary/30 transition-all duration-300 ${justSaved
+                        ? 'bg-primary/10 text-primary border-primary/50'
+                        : 'text-primary hover:bg-primary/10'
+                        }`}
                     >
                       {justSaved ? (
                         <>
@@ -801,44 +871,106 @@ const BasvuruForm = () => {
             </div>
           </motion.div>
 
-          {/* Questions */}
-          <div className="space-y-6 mb-10">
-            {formTemplate.questions.map((question, index) => 
-              renderQuestion(question, index)
-            )}
-          </div>
+          {/* Page Header - Bölüm Başlığı */}
+          {pages.length > 0 && (
+            <motion.div
+              key={`page-header-${currentPageIndex}`}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              className="mb-8"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-primary text-sm font-medium">
+                    Bölüm {currentPageIndex + 1} / {pages.length}
+                  </span>
+                  <h3 className="text-2xl font-bold text-foreground mt-1">
+                    {pages[currentPageIndex]?.title || `Bölüm ${currentPageIndex + 1}`}
+                  </h3>
+                </div>
+                {/* Page Progress */}
+                <div className="flex items-center gap-2">
+                  {pages.map((_, idx) => (
+                    <div
+                      key={idx}
+                      className={`w-3 h-3 rounded-full transition-all duration-300 ${idx === currentPageIndex
+                        ? 'bg-primary scale-125'
+                        : idx < currentPageIndex
+                          ? 'bg-primary/50'
+                          : 'bg-muted'
+                        }`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
 
-          {/* Submit Section */}
+          {/* Questions - Sadece mevcut sayfa */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`page-${currentPageIndex}`}
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-6 mb-10"
+            >
+              {currentPageQuestions.map((question, index) => {
+                // Global index hesapla (soru numarası için)
+                const globalIndex = sortedQuestions.findIndex(q => q.id === question.id);
+                return renderQuestion(question, globalIndex);
+              })}
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Navigation & Submit Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 + formTemplate.questions.length * 0.05 }}
+            transition={{ delay: 0.3 }}
             className="sticky bottom-6 z-20"
           >
             <div className="bg-card/80 backdrop-blur-md border border-border/40 rounded-2xl p-6 shadow-xl">
               <div className="flex flex-col sm:flex-row items-center gap-4">
+                {/* Status */}
                 <div className="flex-1 text-center sm:text-left">
-                  {!isFormValid() ? (
-                    <p className="text-muted-foreground text-sm">
-                      Lütfen tüm zorunlu alanları doldurun
-                    </p>
+                  {!isLastPage ? (
+                    !isCurrentPageValid ? (
+                      <p className="text-muted-foreground text-sm">
+                        Bu bölümdeki tüm zorunlu alanları doldurun
+                      </p>
+                    ) : (
+                      <p className="text-primary text-sm font-medium">
+                        Bölüm tamamlandı, devam edebilirsiniz
+                      </p>
+                    )
                   ) : (
-                    <p className="text-primary text-sm font-medium">
-                      Form gönderilmeye hazır
-                    </p>
+                    !isFormValid() ? (
+                      <p className="text-muted-foreground text-sm">
+                        Lütfen tüm zorunlu alanları doldurun
+                      </p>
+                    ) : (
+                      <p className="text-primary text-sm font-medium">
+                        Form gönderilmeye hazır
+                      </p>
+                    )
                   )}
                 </div>
+
+                {/* Buttons */}
                 <div className="flex items-center gap-2">
+                  {/* Save Button */}
                   <Button
                     variant="outline"
                     size="icon"
                     onClick={saveDraft}
                     disabled={!hasFormData || justSaved}
-                    className={`h-12 w-12 transition-all duration-300 ${
-                      justSaved 
-                        ? 'bg-primary/10 text-primary border-primary/50' 
-                        : 'border-primary/30 text-primary hover:bg-primary/10'
-                    }`}
+                    className={`h-12 w-12 transition-all duration-300 ${justSaved
+                      ? 'bg-primary/10 text-primary border-primary/50'
+                      : 'border-primary/30 text-primary hover:bg-primary/10'
+                      }`}
                     title={justSaved ? "Kaydedildi" : "Cevapları Kaydet"}
                   >
                     {justSaved ? (
@@ -847,23 +979,48 @@ const BasvuruForm = () => {
                       <Save className="w-5 h-5" />
                     )}
                   </Button>
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={!isFormValid() || isSubmitting}
-                    className="w-full sm:w-auto min-w-[200px] h-12 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground font-medium shadow-lg shadow-primary/20"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                        Gönderiliyor...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-5 h-5 mr-2" />
-                        Başvuruyu Gönder
-                      </>
-                    )}
-                  </Button>
+
+                  {/* Previous Page */}
+                  {currentPageIndex > 0 && (
+                    <Button
+                      variant="outline"
+                      onClick={goToPrevPage}
+                      className="h-12 px-4 border-border/50"
+                    >
+                      <ChevronLeft className="w-5 h-5 mr-1" />
+                      Önceki
+                    </Button>
+                  )}
+
+                  {/* Next Page or Submit */}
+                  {!isLastPage ? (
+                    <Button
+                      onClick={goToNextPage}
+                      disabled={!isCurrentPageValid}
+                      className="h-12 px-6 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                    >
+                      Sonraki Bölüm
+                      <ChevronRight className="w-5 h-5 ml-1" />
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={!isFormValid() || isSubmitting}
+                      className="min-w-[200px] h-12 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground font-medium shadow-lg shadow-primary/20"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                          Gönderiliyor...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-5 h-5 mr-2" />
+                          Başvuruyu Gönder
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -884,8 +1041,8 @@ const BasvuruForm = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>İptal</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={clearForm} 
+            <AlertDialogAction
+              onClick={clearForm}
               className="bg-destructive hover:bg-destructive/90"
             >
               Evet, Temizle

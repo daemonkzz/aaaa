@@ -281,7 +281,8 @@ const AdminBasvuruDetay = () => {
           // Kilitleme - staff kararı sonrası
           is_locked: true,
           locked_by: 'staff',
-          locked_at: new Date().toISOString()
+          locked_at: new Date().toISOString(),
+          ai_processing_status: null  // Kuyruktaysa çıkar
         })
         .eq('id', application.id);
 
