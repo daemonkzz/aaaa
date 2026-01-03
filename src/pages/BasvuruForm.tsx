@@ -888,7 +888,7 @@ const BasvuruForm = () => {
                         key={page.id}
                         className={`text-[10px] ${idx === currentPageIndex ? 'text-primary font-medium' : 'text-muted-foreground'}`}
                       >
-                        {idx + 1}. {page.title.length > 10 ? page.title.slice(0, 10) + '...' : page.title}
+                        {page.title}
                       </span>
                     ))}
                   </div>
@@ -896,7 +896,6 @@ const BasvuruForm = () => {
 
                 <p className="text-xs text-muted-foreground mt-2">
                   {sortedQuestions.length} soru · {sortedQuestions.filter(q => q.required).length} zorunlu
-                  {pages.length > 0 && ` · Bölüm ${currentPageIndex + 1}/${pages.length}`}
                 </p>
               </motion.div>
 
@@ -955,41 +954,29 @@ const BasvuruForm = () => {
             </div>
           </motion.div>
 
-          {/* Page Header - Bölüm Başlığı */}
+          {/* Page Header - Minimal */}
           {pages.length > 0 && (
             <motion.div
               key={`page-header-${currentPageIndex}`}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-              className="mb-8"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2 }}
+              className="mb-6 flex items-center justify-between"
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-primary text-sm font-medium">
-                    Bölüm {currentPageIndex + 1} / {pages.length}
-                  </span>
-                  <h3 className="text-2xl font-bold text-foreground mt-1">
-                    {pages[currentPageIndex]?.title || `Bölüm ${currentPageIndex + 1}`}
-                  </h3>
-                </div>
-                {/* Page Progress */}
-                <div className="flex items-center gap-2">
-                  {pages.map((_, idx) => (
-                    <div
-                      key={idx}
-                      className={`w-3 h-3 rounded-full transition-all duration-300 ${idx === currentPageIndex
-                        ? 'bg-primary scale-125'
-                        : idx < currentPageIndex
-                          ? 'bg-primary/50'
-                          : 'bg-muted'
-                        }`}
-                    />
-                  ))}
-                </div>
+              <h3 className="text-lg font-semibold text-foreground">
+                {pages[currentPageIndex]?.title}
+              </h3>
+              <div className="flex items-center gap-1.5">
+                {pages.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className={`w-2 h-2 rounded-full transition-colors ${idx <= currentPageIndex ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                  />
+                ))}
               </div>
             </motion.div>
           )}
+
 
           {/* Questions - Sadece mevcut sayfa */}
           <AnimatePresence mode="wait">
@@ -1109,8 +1096,8 @@ const BasvuruForm = () => {
               </div>
             </div>
           </motion.div>
-        </div>
-      </main>
+        </div >
+      </main >
 
       <Footer />
 
@@ -1134,7 +1121,7 @@ const BasvuruForm = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </div >
   );
 };
 
