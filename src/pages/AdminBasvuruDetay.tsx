@@ -354,7 +354,18 @@ const AdminBasvuruDetay = () => {
       }
 
       toast.success(status === 'approved' ? 'Başvuru onaylandı' : 'Başvuru reddedildi');
-      navigate('/admin');
+
+      // State'i güncelle - sayfada kal
+      setApplication(prev => prev ? {
+        ...prev,
+        status,
+        admin_note: adminNote || null,
+        is_locked: true
+      } : null);
+
+      // Checkbox'ları sıfırla
+      setConfirmApprove(false);
+      setConfirmReject(false);
     } catch (error) {
       console.error('Update error:', error);
       toast.error('Durum güncellenirken hata oluştu');
@@ -384,8 +395,19 @@ const AdminBasvuruDetay = () => {
       if (error) throw error;
 
       toast.success('Başvuru beklemede durumuna alındı');
-      // Sayfayı yenile
-      window.location.reload();
+
+      // State'i güncelle - sayfada kal
+      setApplication(prev => prev ? {
+        ...prev,
+        status: 'pending',
+        is_locked: false,
+        admin_note: null,
+        ai_processing_status: null
+      } : null);
+
+      // Checkbox'ları sıfırla
+      setConfirmApprove(false);
+      setConfirmReject(false);
     } catch (error) {
       console.error('Reset error:', error);
       toast.error('Durum sıfırlanırken hata oluştu');

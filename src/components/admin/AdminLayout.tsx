@@ -81,9 +81,18 @@ export const AdminLayout = ({ children, activeTab: propActiveTab }: AdminLayoutP
   const navigate = useNavigate();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const { isSuperAdmin, allowedTabs, isLoading: permLoading } = useUserPermissions();
 
+  // Aktif tab'ı path'den al - her render'da güncel olsun
   const activeTab = propActiveTab || getActiveTabFromPath(location.pathname, location.search);
+
+  // İlk yükleme tamamlandığında işaretle
+  useEffect(() => {
+    if (!permLoading && !hasInitiallyLoaded) {
+      setHasInitiallyLoaded(true);
+    }
+  }, [permLoading, hasInitiallyLoaded]);
 
   // Filter sidebar items based on permissions
   const sidebarItems = allSidebarItems.filter(item => {
@@ -101,7 +110,8 @@ export const AdminLayout = ({ children, activeTab: propActiveTab }: AdminLayoutP
     navigate(item.path);
   };
 
-  if (permLoading) {
+  // Sadece ilk yüklemede loading göster
+  if (permLoading && !hasInitiallyLoaded) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -140,8 +150,8 @@ export const AdminLayout = ({ children, activeTab: propActiveTab }: AdminLayoutP
                 <button
                   onClick={() => handleTabClick(item)}
                   className={`w-full flex items-center rounded-lg transition-all duration-200 ${isCollapsed
-                      ? 'justify-center p-3'
-                      : 'gap-3 px-4 py-3'
+                    ? 'justify-center p-3'
+                    : 'gap-3 px-4 py-3'
                     } ${activeTab === item.id
                       ? 'bg-primary/10 text-primary border border-primary/20'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground'

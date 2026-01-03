@@ -116,9 +116,13 @@ const BasvuruForm = () => {
           const parsed = JSON.parse(savedDraft);
           setFormData(parsed.data || {});
           setLastSaved(parsed.savedAt ? new Date(parsed.savedAt) : null);
+          // Kaldığı sayfadan devam et
+          if (parsed.pageIndex !== undefined && parsed.pageIndex >= 0) {
+            setCurrentPageIndex(parsed.pageIndex);
+          }
           toast({
             title: "Taslak Yüklendi",
-            description: "Önceki cevaplarınız otomatik olarak yüklendi.",
+            description: "Önceki cevaplarınız ve kaldığınız sayfa yüklendi.",
           });
         } catch (e) {
           console.error('Draft parse error:', e);
@@ -135,7 +139,8 @@ const BasvuruForm = () => {
 
     localStorage.setItem(draftKey, JSON.stringify({
       data: formData,
-      savedAt: now.toISOString()
+      savedAt: now.toISOString(),
+      pageIndex: currentPageIndex
     }));
 
     setLastSaved(now);
