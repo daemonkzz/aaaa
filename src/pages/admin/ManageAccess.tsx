@@ -822,7 +822,7 @@ const ManageAccessContent: React.FC = () => {
 
 const ManageAccess = () => {
   return (
-    <AdminLayout activeTab="yetkilendirme">
+    <AdminLayout activeTab="2fa">
       <ManageAccessContent />
     </AdminLayout>
   );

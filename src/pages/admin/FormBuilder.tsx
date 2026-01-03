@@ -51,7 +51,7 @@ const FormBuilder = () => {
   const { id } = useParams();
   const { user, isLoading: authLoading } = useAuth();
   const { getFormBuilderState, setFormBuilderState, clearFormBuilderState } = useAdminEditorState();
-  
+
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -59,7 +59,7 @@ const FormBuilder = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [hasActiveWhitelistForm, setHasActiveWhitelistForm] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
-  
+
   // Form data state
   const [formData, setFormData] = useState<FormBuilderData>(defaultFormData);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -70,7 +70,7 @@ const FormBuilder = () => {
   useEffect(() => {
     const checkAdminRole = async () => {
       if (authLoading) return;
-      
+
       if (!user) {
         toast.error('Bu sayfaya erişmek için giriş yapmalısınız');
         navigate('/admin');
@@ -129,7 +129,7 @@ const FormBuilder = () => {
   // Load data: First check context, then DB
   useEffect(() => {
     if (!isAuthorized) return;
-    
+
     // Check context for existing state
     const contextState = getFormBuilderState(stateKey);
     if (contextState) {
@@ -138,7 +138,7 @@ const FormBuilder = () => {
       setIsDataLoaded(true);
       return;
     }
-    
+
     // No context state, load from DB if editing
     if (id) {
       loadFormTemplate();
@@ -151,7 +151,7 @@ const FormBuilder = () => {
 
   const loadFormTemplate = async () => {
     if (!id) return;
-    
+
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -167,7 +167,7 @@ const FormBuilder = () => {
         const loadedSettings = data.settings as Record<string, unknown> || {};
         const loadedPages = (loadedSettings.pages as FormPage[]) || [];
         const loadedFormType = (loadedSettings.formType as FormType) || 'other';
-        
+
         const loadedData: FormBuilderData = {
           title: data.title,
           description: data.description || '',
@@ -186,7 +186,7 @@ const FormBuilder = () => {
             formType: loadedFormType,
           },
         };
-        
+
         setFormData(loadedData);
         originalDataRef.current = JSON.stringify(loadedData);
         setIsDataLoaded(true);
@@ -202,7 +202,7 @@ const FormBuilder = () => {
   // Sync formType with settings
   useEffect(() => {
     if (!isDataLoaded) return;
-    
+
     setFormData((prev) => ({
       ...prev,
       settings: {
@@ -216,11 +216,11 @@ const FormBuilder = () => {
   // Save to context on every change
   useEffect(() => {
     if (!isDataLoaded) return;
-    
+
     const currentDataStr = JSON.stringify(formData);
     const isChanged = currentDataStr !== originalDataRef.current;
     setHasUnsavedChanges(isChanged);
-    
+
     // Always save current state to context
     setFormBuilderState(stateKey, formData);
   }, [formData, isDataLoaded, stateKey, setFormBuilderState]);
@@ -322,7 +322,8 @@ const FormBuilder = () => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  if (authLoading || isCheckingAuth || isLoading) {
+  // Loading - sadece yetki kontrolü veya veri yüklenirken göster
+  if (isCheckingAuth || isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">

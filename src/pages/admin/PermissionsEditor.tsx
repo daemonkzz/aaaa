@@ -317,7 +317,8 @@ const PermissionsEditor = () => {
     user.username?.toLowerCase().includes(userSearch.toLowerCase())
   );
 
-  if (permLoading || isLoading) {
+  // Loading - sadece veri yüklenirken göster (permLoading artık global cache kullanıyor)
+  if (isLoading) {
     return (
       <AdminRouteGuard>
         <AdminLayout activeTab="yetkilendirme">
@@ -492,8 +493,8 @@ const PermissionsEditor = () => {
                       <div
                         key={tab}
                         className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${formTabs.includes(tab)
-                            ? 'border-primary bg-primary/10'
-                            : 'border-border hover:bg-muted'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:bg-muted'
                           }`}
                         onClick={() => toggleTab(tab)}
                       >
@@ -612,8 +613,8 @@ const PermissionsEditor = () => {
                   <div
                     key={user.id}
                     className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${assignedUsers.includes(user.id)
-                        ? 'bg-primary/10 border border-primary/30'
-                        : 'hover:bg-muted border border-transparent'
+                      ? 'bg-primary/10 border border-primary/30'
+                      : 'hover:bg-muted border border-transparent'
                       }`}
                     onClick={() => handleToggleUserAssignment(user.id)}
                   >

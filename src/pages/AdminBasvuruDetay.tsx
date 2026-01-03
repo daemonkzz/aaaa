@@ -554,11 +554,11 @@ const AdminBasvuruDetay = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link
-              to="/admin"
+              to="/admin?tab=basvurular"
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
-              <span>Admin Paneline Dön</span>
+              <span>Başvurulara Dön</span>
             </Link>
             <div className="flex items-center gap-3">
               {getStatusBadge(application.status)}

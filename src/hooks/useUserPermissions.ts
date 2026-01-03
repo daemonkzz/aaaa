@@ -3,6 +3,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { AdminPermission, TabKey, ALL_TABS } from '@/types/permissions';
 
+// Global cache - sayfa geçişlerinde permission'ları tekrar yüklememek için
+let globalPermissionCache: {
+  isSuperAdmin: boolean;
+  permissions: AdminPermission[];
+  userId: string | null;
+  fetchedAt: number;
+} | null = null;
+
+const CACHE_DURATION = 5 * 60 * 1000; // 5 dakika cache
+
 interface UseUserPermissionsReturn {
   isSuperAdmin: boolean;
   isLoading: boolean;
@@ -15,12 +25,28 @@ interface UseUserPermissionsReturn {
 
 export const useUserPermissions = (): UseUserPermissionsReturn => {
   const { user } = useAuth();
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [permissions, setPermissions] = useState<AdminPermission[]>([]);
 
-  const fetchPermissions = useCallback(async () => {
+  // Cache varsa ve geçerliyse, cache'den başla
+  const cachedData = globalPermissionCache &&
+    globalPermissionCache.userId === user?.id &&
+    Date.now() - globalPermissionCache.fetchedAt < CACHE_DURATION;
+
+  const [isSuperAdmin, setIsSuperAdmin] = useState(cachedData ? globalPermissionCache!.isSuperAdmin : false);
+  const [isLoading, setIsLoading] = useState(!cachedData); // Cache varsa loading false
+  const [permissions, setPermissions] = useState<AdminPermission[]>(cachedData ? globalPermissionCache!.permissions : []);
+
+  const fetchPermissions = useCallback(async (forceRefetch = false) => {
     if (!user) {
+      setIsLoading(false);
+      return;
+    }
+
+    // Cache hala geçerliyse ve force değilse, skip
+    if (!forceRefetch && globalPermissionCache &&
+      globalPermissionCache.userId === user.id &&
+      Date.now() - globalPermissionCache.fetchedAt < CACHE_DURATION) {
+      setIsSuperAdmin(globalPermissionCache.isSuperAdmin);
+      setPermissions(globalPermissionCache.permissions);
       setIsLoading(false);
       return;
     }
@@ -34,7 +60,8 @@ export const useUserPermissions = (): UseUserPermissionsReturn => {
         console.error('Super admin check error:', saError);
       }
 
-      setIsSuperAdmin(superAdminCheck === true);
+      const isSA = superAdminCheck === true;
+      setIsSuperAdmin(isSA);
 
       // Fetch user's permissions
       const { data: userPerms, error: permError } = await supabase
@@ -46,6 +73,14 @@ export const useUserPermissions = (): UseUserPermissionsReturn => {
       } else {
         setPermissions(userPerms || []);
       }
+
+      // Global cache'e kaydet
+      globalPermissionCache = {
+        isSuperAdmin: isSA,
+        permissions: userPerms || [],
+        userId: user.id,
+        fetchedAt: Date.now()
+      };
     } catch (error) {
       console.error('Permission check error:', error);
     } finally {
@@ -69,7 +104,7 @@ export const useUserPermissions = (): UseUserPermissionsReturn => {
 
   const canManage = useCallback((feature: 'users' | 'applications' | 'forms' | 'updates' | 'rules' | 'gallery' | 'notifications' | 'whiteboard' | 'glossary'): boolean => {
     if (isSuperAdmin) return true;
-    
+
     const featureMap: Record<string, keyof AdminPermission> = {
       users: 'can_manage_users',
       applications: 'can_manage_applications',
@@ -92,6 +127,6 @@ export const useUserPermissions = (): UseUserPermissionsReturn => {
     allowedTabs,
     canAccessTab,
     canManage,
-    refetch: fetchPermissions,
+    refetch: () => fetchPermissions(true), // Force refetch
   };
 };
