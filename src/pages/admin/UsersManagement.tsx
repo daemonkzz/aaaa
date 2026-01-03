@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import type { AdminPermission } from '@/types/permissions';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Search, 
-  Filter, 
-  Ban, 
-  MessageSquare, 
-  Eye, 
-  Shield, 
+import {
+  Search,
+  Filter,
+  Ban,
+  MessageSquare,
+  Eye,
+  Shield,
   ShieldCheck,
   ShieldX,
   UserCheck,
@@ -67,14 +67,20 @@ import type { UserWithPermissions } from '@/types/permissions';
 
 const UsersManagement = () => {
   const navigate = useNavigate();
-  const { isSuperAdmin } = useUserPermissions();
-  const { 
-    users, 
-    isLoading, 
-    totalCount, 
-    fetchUsers, 
-    banUser, 
-    unbanUser, 
+  const {
+    isSuperAdmin,
+    canBanUsers,
+    canManageWhitelist,
+    canSendDiscordDm,
+    canSendTargetedNotifications
+  } = useUserPermissions();
+  const {
+    users,
+    isLoading,
+    totalCount,
+    fetchUsers,
+    banUser,
+    unbanUser,
     updateWhitelistStatus,
     sendNotification,
   } = useUsersManagement();
@@ -159,16 +165,16 @@ const UsersManagement = () => {
 
   const handleSendDiscordDm = async () => {
     if (!selectedUser?.discord_id || !discordMessage.trim()) return;
-    
+
     // Discord ID numeric olmalı (snowflake ID)
     const discordId = selectedUser.discord_id;
     const isNumericId = /^\d{17,19}$/.test(discordId);
-    
+
     if (!isNumericId) {
       toast.error('Discord ID geçersiz formatı. Numeric Discord ID gerekli (örn: 123456789012345678). Kullanıcı adı (örn: daemonkz#0) değil, numeric ID kullanılmalı.');
       return;
     }
-    
+
     setIsSending(true);
     try {
       const { error } = await supabase.functions.invoke('send-discord-dm', {
@@ -350,7 +356,7 @@ const UsersManagement = () => {
                               <MessageSquare className="w-4 h-4 mr-2" />
                               Mesaj Gönder
                             </DropdownMenuItem>
-                            {user.discord_id && (
+                            {user.discord_id && canSendDiscordDm && (
                               <DropdownMenuItem onClick={() => {
                                 setSelectedUser(user);
                                 setDiscordDmModalOpen(true);
@@ -359,40 +365,48 @@ const UsersManagement = () => {
                                 Discord DM Gönder
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleWhitelistToggle(user)}>
-                              {user.is_whitelist_approved ? (
-                                <>
-                                  <UserX className="w-4 h-4 mr-2" />
-                                  Whitelist Kaldır
-                                </>
-                              ) : (
-                                <>
-                                  <UserCheck className="w-4 h-4 mr-2" />
-                                  Whitelist Onayla
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {user.is_banned ? (
-                              <DropdownMenuItem 
-                                onClick={() => handleUnban(user)}
-                                className="text-emerald-500"
-                              >
-                                <ShieldCheck className="w-4 h-4 mr-2" />
-                                Yasağı Kaldır
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem 
-                                onClick={() => {
-                                  setSelectedUser(user);
-                                  setBanModalOpen(true);
-                                }}
-                                className="text-red-500"
-                              >
-                                <ShieldX className="w-4 h-4 mr-2" />
-                                Yasakla
-                              </DropdownMenuItem>
+                            {canManageWhitelist && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleWhitelistToggle(user)}>
+                                  {user.is_whitelist_approved ? (
+                                    <>
+                                      <UserX className="w-4 h-4 mr-2" />
+                                      Whitelist Kaldır
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserCheck className="w-4 h-4 mr-2" />
+                                      Whitelist Onayla
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {canBanUsers && (
+                              <>
+                                <DropdownMenuSeparator />
+                                {user.is_banned ? (
+                                  <DropdownMenuItem
+                                    onClick={() => handleUnban(user)}
+                                    className="text-emerald-500"
+                                  >
+                                    <ShieldCheck className="w-4 h-4 mr-2" />
+                                    Yasağı Kaldır
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setSelectedUser(user);
+                                      setBanModalOpen(true);
+                                    }}
+                                    className="text-red-500"
+                                  >
+                                    <ShieldX className="w-4 h-4 mr-2" />
+                                    Yasakla
+                                  </DropdownMenuItem>
+                                )}
+                              </>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -459,8 +473,8 @@ const UsersManagement = () => {
               <Button variant="outline" onClick={() => setBanModalOpen(false)}>
                 İptal
               </Button>
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 onClick={handleBan}
                 disabled={!banReason.trim() || isSending}
               >
@@ -505,7 +519,7 @@ const UsersManagement = () => {
               <Button variant="outline" onClick={() => setMessageModalOpen(false)}>
                 İptal
               </Button>
-              <Button 
+              <Button
                 onClick={handleSendMessage}
                 disabled={!messageTitle.trim() || !messageContent.trim() || isSending}
               >
@@ -541,7 +555,7 @@ const UsersManagement = () => {
               <Button variant="outline" onClick={() => setDiscordDmModalOpen(false)}>
                 İptal
               </Button>
-              <Button 
+              <Button
                 onClick={handleSendDiscordDm}
                 disabled={!discordMessage.trim() || isSending}
               >

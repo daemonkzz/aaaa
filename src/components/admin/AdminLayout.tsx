@@ -82,7 +82,7 @@ export const AdminLayout = ({ children, activeTab: propActiveTab }: AdminLayoutP
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
-  const { isSuperAdmin, allowedTabs, isLoading: permLoading } = useUserPermissions();
+  const { isSuperAdmin, allowedTabs, isLoading: permLoading, canAccessTab } = useUserPermissions();
 
   // Aktif tab'ı path'den al - her render'da güncel olsun
   const activeTab = propActiveTab || getActiveTabFromPath(location.pathname, location.search);
@@ -93,6 +93,21 @@ export const AdminLayout = ({ children, activeTab: propActiveTab }: AdminLayoutP
       setHasInitiallyLoaded(true);
     }
   }, [permLoading, hasInitiallyLoaded]);
+
+  // Yetkisiz tab'a erişim kontrolü - URL bypass'ı engelle
+  useEffect(() => {
+    if (permLoading || !hasInitiallyLoaded) return;
+
+    // Super admin her yere girebilir
+    if (isSuperAdmin) return;
+
+    // Aktif tab'a erişim yetkisi var mı?
+    if (!canAccessTab(activeTab as TabKey)) {
+      // Yetkisiz erişim - dashboard'a yönlendir
+      console.warn(`Unauthorized access to tab: ${activeTab}, redirecting to dashboard`);
+      navigate('/admin?tab=dashboard', { replace: true });
+    }
+  }, [activeTab, isSuperAdmin, canAccessTab, permLoading, hasInitiallyLoaded, navigate]);
 
   // Filter sidebar items based on permissions
   const sidebarItems = allSidebarItems.filter(item => {

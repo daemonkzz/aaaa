@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { AdminLayout } from '@/components/admin/AdminLayout';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 
 interface GalleryImage {
   id: string;
@@ -53,8 +54,9 @@ interface UploadingFile {
 
 const GalleryContent = () => {
   const { user } = useAuth();
+  const { canUploadMedia, canDeleteContent } = useUserPermissions();
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
@@ -113,7 +115,7 @@ const GalleryContent = () => {
       const originalSize = file.size;
 
       // Update status to compressing
-      setUploadingFiles(prev => prev.map(f => 
+      setUploadingFiles(prev => prev.map(f =>
         f.id === fileId ? { ...f, status: 'compressing' as const, progress: 10 } : f
       ));
 
@@ -133,7 +135,7 @@ const GalleryContent = () => {
       const dimensions = await getImageDimensions(compressedFile);
 
       // Update status to uploading
-      setUploadingFiles(prev => prev.map(f => 
+      setUploadingFiles(prev => prev.map(f =>
         f.id === fileId ? { ...f, status: 'uploading' as const, progress: 40, optimizedSize } : f
       ));
 
@@ -154,7 +156,7 @@ const GalleryContent = () => {
         throw uploadError;
       }
 
-      setUploadingFiles(prev => prev.map(f => 
+      setUploadingFiles(prev => prev.map(f =>
         f.id === fileId ? { ...f, progress: 70 } : f
       ));
 
@@ -182,7 +184,7 @@ const GalleryContent = () => {
       }
 
       // Update status to done
-      setUploadingFiles(prev => prev.map(f => 
+      setUploadingFiles(prev => prev.map(f =>
         f.id === fileId ? { ...f, status: 'done' as const, progress: 100 } : f
       ));
 
@@ -193,7 +195,7 @@ const GalleryContent = () => {
 
     } catch (error) {
       console.error('Upload error:', error);
-      setUploadingFiles(prev => prev.map(f => 
+      setUploadingFiles(prev => prev.map(f =>
         f.id === fileId ? { ...f, status: 'error' as const } : f
       ));
     }
@@ -201,7 +203,7 @@ const GalleryContent = () => {
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     // Filter only images
-    const imageFiles = acceptedFiles.filter(file => 
+    const imageFiles = acceptedFiles.filter(file =>
       file.type.startsWith('image/')
     );
 
@@ -323,8 +325,8 @@ const GalleryContent = () => {
               {selectedImages.size === images.length ? 'Seçimi Kaldır' : 'Tümünü Seç'}
             </Button>
           )}
-          
-          {selectedImages.size > 0 && (
+
+          {selectedImages.size > 0 && canDeleteContent && (
             <Button
               variant="destructive"
               size="sm"
@@ -337,39 +339,45 @@ const GalleryContent = () => {
         </div>
       </div>
 
-      {/* Drop Zone */}
-      <div
-        {...getRootProps()}
-        className={`
-          border-2 border-dashed rounded-xl p-12 text-center cursor-pointer
-          transition-all duration-300 mb-8
-          ${isDragActive 
-            ? 'border-primary bg-primary/10 scale-[1.02]' 
-            : 'border-border hover:border-primary/50 hover:bg-card/50'
-          }
-        `}
-      >
-        <input {...getInputProps()} />
-        <div className="flex flex-col items-center gap-4">
-          <div className={`
-            w-16 h-16 rounded-full flex items-center justify-center
-            ${isDragActive ? 'bg-primary/20' : 'bg-muted'}
-          `}>
-            <Upload className={`w-8 h-8 ${isDragActive ? 'text-primary' : 'text-muted-foreground'}`} />
+      {/* Drop Zone - only show if user can upload */}
+      {canUploadMedia ? (
+        <div
+          {...getRootProps()}
+          className={`
+            border-2 border-dashed rounded-xl p-12 text-center cursor-pointer
+            transition-all duration-300 mb-8
+            ${isDragActive
+              ? 'border-primary bg-primary/10 scale-[1.02]'
+              : 'border-border hover:border-primary/50 hover:bg-card/50'
+            }
+          `}
+        >
+          <input {...getInputProps()} />
+          <div className="flex flex-col items-center gap-4">
+            <div className={`
+              w-16 h-16 rounded-full flex items-center justify-center
+              ${isDragActive ? 'bg-primary/20' : 'bg-muted'}
+            `}>
+              <Upload className={`w-8 h-8 ${isDragActive ? 'text-primary' : 'text-muted-foreground'}`} />
+            </div>
+            <div>
+              <p className="text-lg font-medium text-foreground">
+                {isDragActive ? 'Bırakın!' : 'Görselleri sürükleyip bırakın'}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                veya dosya seçmek için tıklayın (JPG, PNG, WebP)
+              </p>
+            </div>
+            <Badge variant="secondary" className="mt-2">
+              Otomatik WebP dönüşümü • Maks 1920px • %80 kalite
+            </Badge>
           </div>
-          <div>
-            <p className="text-lg font-medium text-foreground">
-              {isDragActive ? 'Bırakın!' : 'Görselleri sürükleyip bırakın'}
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              veya dosya seçmek için tıklayın (JPG, PNG, WebP)
-            </p>
-          </div>
-          <Badge variant="secondary" className="mt-2">
-            Otomatik WebP dönüşümü • Maks 1920px • %80 kalite
-          </Badge>
         </div>
-      </div>
+      ) : (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-6 text-center mb-8">
+          <p className="text-amber-500 text-sm">⚠️ Görsel yükleme yetkiniz bulunmamaktadır.</p>
+        </div>
+      )}
 
       {/* Upload Progress */}
       {uploadingFiles.length > 0 && (
@@ -440,8 +448,8 @@ const GalleryContent = () => {
               key={image.id}
               className={`
                 relative group rounded-lg overflow-hidden border-2 transition-all
-                ${selectedImages.has(image.id) 
-                  ? 'border-primary ring-2 ring-primary/20' 
+                ${selectedImages.has(image.id)
+                  ? 'border-primary ring-2 ring-primary/20'
                   : 'border-border hover:border-primary/50'
                 }
               `}

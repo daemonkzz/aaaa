@@ -656,12 +656,14 @@ const Admin = () => {
                     <SelectItem value="all">Tüm Başvurular</SelectItem>
                     <SelectItem value="whitelist">Whitelist Başvuruları</SelectItem>
                     <SelectItem value="other">Diğer Başvurular</SelectItem>
-                    <SelectItem value="pending">
-                      <div className="flex items-center gap-2">
-                        <Eye className="w-3 h-3 text-blue-400" />
-                        AI Kuyruğunda
-                      </div>
-                    </SelectItem>
+                    {isSuperAdmin && (
+                      <SelectItem value="pending">
+                        <div className="flex items-center gap-2">
+                          <Eye className="w-3 h-3 text-blue-400" />
+                          AI Kuyruğunda
+                        </div>
+                      </SelectItem>
+                    )}
                     {isSuperAdmin && (
                       <SelectItem value="conflict">
                         <div className="flex items-center gap-2">

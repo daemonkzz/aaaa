@@ -52,7 +52,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { useUserPermissions, clearPermissionCache } from '@/hooks/useUserPermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { TAB_NAMES, type AdminPermission, type TabKey, ALL_TABS } from '@/types/permissions';
@@ -77,7 +77,7 @@ const PermissionsEditor = () => {
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedPermission, setSelectedPermission] = useState<AdminPermission | null>(null);
 
-  // Form states
+  // Form states - Temel yetkiler
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formTabs, setFormTabs] = useState<TabKey[]>([]);
@@ -90,6 +90,18 @@ const PermissionsEditor = () => {
   const [formCanManageNotifications, setFormCanManageNotifications] = useState(false);
   const [formCanManageWhiteboard, setFormCanManageWhiteboard] = useState(false);
   const [formCanManageGlossary, setFormCanManageGlossary] = useState(false);
+  // Form states - Yeni granüler yetkiler
+  const [formCanBanUsers, setFormCanBanUsers] = useState(false);
+  const [formCanApproveApplications, setFormCanApproveApplications] = useState(false);
+  const [formCanRejectApplications, setFormCanRejectApplications] = useState(false);
+  const [formCanDeleteContent, setFormCanDeleteContent] = useState(false);
+  const [formCanPublishContent, setFormCanPublishContent] = useState(false);
+  const [formCanUploadMedia, setFormCanUploadMedia] = useState(false);
+  const [formCanSendGlobalNotifications, setFormCanSendGlobalNotifications] = useState(false);
+  const [formCanSendTargetedNotifications, setFormCanSendTargetedNotifications] = useState(false);
+  const [formCanSendDiscordDm, setFormCanSendDiscordDm] = useState(false);
+  const [formCanManageWhitelist, setFormCanManageWhitelist] = useState(false);
+  const [formCanViewApplicationDetails, setFormCanViewApplicationDetails] = useState(false);
   const [formCanViewAIConflicts, setFormCanViewAIConflicts] = useState(false);
 
   // User assignment
@@ -160,6 +172,7 @@ const PermissionsEditor = () => {
       setFormName(permission.name);
       setFormDescription(permission.description || '');
       setFormTabs(permission.allowed_tabs as TabKey[]);
+      // Temel yetkiler
       setFormCanManageUsers(permission.can_manage_users);
       setFormCanManageApplications(permission.can_manage_applications);
       setFormCanManageForms(permission.can_manage_forms);
@@ -169,12 +182,25 @@ const PermissionsEditor = () => {
       setFormCanManageNotifications(permission.can_manage_notifications);
       setFormCanManageWhiteboard(permission.can_manage_whiteboard);
       setFormCanManageGlossary(permission.can_manage_glossary);
-      setFormCanViewAIConflicts((permission as any).can_view_ai_conflicts || false);
+      // Yeni granüler yetkiler
+      setFormCanBanUsers(permission.can_ban_users ?? false);
+      setFormCanApproveApplications(permission.can_approve_applications ?? false);
+      setFormCanRejectApplications(permission.can_reject_applications ?? false);
+      setFormCanDeleteContent(permission.can_delete_content ?? false);
+      setFormCanPublishContent(permission.can_publish_content ?? false);
+      setFormCanUploadMedia(permission.can_upload_media ?? false);
+      setFormCanSendGlobalNotifications(permission.can_send_global_notifications ?? false);
+      setFormCanSendTargetedNotifications(permission.can_send_targeted_notifications ?? false);
+      setFormCanSendDiscordDm(permission.can_send_discord_dm ?? false);
+      setFormCanManageWhitelist(permission.can_manage_whitelist ?? false);
+      setFormCanViewApplicationDetails(permission.can_view_application_details ?? false);
+      setFormCanViewAIConflicts(permission.can_view_ai_conflicts ?? false);
     } else {
       setSelectedPermission(null);
       setFormName('');
       setFormDescription('');
       setFormTabs([]);
+      // Temel yetkiler
       setFormCanManageUsers(false);
       setFormCanManageApplications(false);
       setFormCanManageForms(false);
@@ -184,6 +210,18 @@ const PermissionsEditor = () => {
       setFormCanManageNotifications(false);
       setFormCanManageWhiteboard(false);
       setFormCanManageGlossary(false);
+      // Yeni granüler yetkiler
+      setFormCanBanUsers(false);
+      setFormCanApproveApplications(false);
+      setFormCanRejectApplications(false);
+      setFormCanDeleteContent(false);
+      setFormCanPublishContent(false);
+      setFormCanUploadMedia(false);
+      setFormCanSendGlobalNotifications(false);
+      setFormCanSendTargetedNotifications(false);
+      setFormCanSendDiscordDm(false);
+      setFormCanManageWhitelist(false);
+      setFormCanViewApplicationDetails(false);
       setFormCanViewAIConflicts(false);
     }
     setEditModalOpen(true);
@@ -201,6 +239,7 @@ const PermissionsEditor = () => {
         name: formName,
         description: formDescription || null,
         allowed_tabs: formTabs,
+        // Temel yetkiler
         can_manage_users: formCanManageUsers,
         can_manage_applications: formCanManageApplications,
         can_manage_forms: formCanManageForms,
@@ -210,6 +249,18 @@ const PermissionsEditor = () => {
         can_manage_notifications: formCanManageNotifications,
         can_manage_whiteboard: formCanManageWhiteboard,
         can_manage_glossary: formCanManageGlossary,
+        // Yeni granüler yetkiler
+        can_ban_users: formCanBanUsers,
+        can_approve_applications: formCanApproveApplications,
+        can_reject_applications: formCanRejectApplications,
+        can_delete_content: formCanDeleteContent,
+        can_publish_content: formCanPublishContent,
+        can_upload_media: formCanUploadMedia,
+        can_send_global_notifications: formCanSendGlobalNotifications,
+        can_send_targeted_notifications: formCanSendTargetedNotifications,
+        can_send_discord_dm: formCanSendDiscordDm,
+        can_manage_whitelist: formCanManageWhitelist,
+        can_view_application_details: formCanViewApplicationDetails,
         can_view_ai_conflicts: formCanViewAIConflicts,
       };
 
@@ -231,6 +282,7 @@ const PermissionsEditor = () => {
       }
 
       setEditModalOpen(false);
+      clearPermissionCache(); // Yetki değişti, cache'i temizle
       fetchPermissions();
     } catch (error: any) {
       console.error('Save permission error:', error);
@@ -257,6 +309,7 @@ const PermissionsEditor = () => {
       toast.success('Yetki silindi');
       setDeleteDialogOpen(false);
       setSelectedPermission(null);
+      clearPermissionCache(); // Yetki değişti, cache'i temizle
       fetchPermissions();
     } catch (error) {
       console.error('Delete permission error:', error);
@@ -285,6 +338,7 @@ const PermissionsEditor = () => {
 
         if (error) throw error;
         setAssignedUsers(prev => prev.filter(id => id !== userId));
+        clearPermissionCache(); // Kullanıcı yetkisi değişti, cache'i temizle
         toast.success('Yetki kaldırıldı');
       } else {
         const { error } = await supabase
@@ -296,6 +350,7 @@ const PermissionsEditor = () => {
 
         if (error) throw error;
         setAssignedUsers(prev => [...prev, userId]);
+        clearPermissionCache(); // Kullanıcı yetkisi değişti, cache'i temizle
         toast.success('Yetki atandı');
       }
     } catch (error) {
@@ -461,100 +516,476 @@ const PermissionsEditor = () => {
               {/* Basic Info */}
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="perm-name">Yetki Adı</Label>
+                  <Label htmlFor="perm-name">Yetki Adı *</Label>
                   <Input
                     id="perm-name"
-                    placeholder="örn: Moderatör"
+                    placeholder="örn: Moderatör, İçerik Editörü"
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
+                    className="mt-1"
                   />
                 </div>
                 <div>
                   <Label htmlFor="perm-desc">Açıklama</Label>
                   <Textarea
                     id="perm-desc"
-                    placeholder="Bu yetkinin ne işe yaradığını açıklayın..."
+                    placeholder="Bu yetkinin amacını ve kapsamını açıklayın..."
                     value={formDescription}
                     onChange={(e) => setFormDescription(e.target.value)}
                     rows={2}
+                    className="mt-1"
                   />
                 </div>
               </div>
 
-              {/* Tab Access */}
+              {/* Tab Access - Categorized */}
               <Collapsible defaultOpen>
-                <CollapsibleTrigger className="flex items-center justify-between w-full py-2 text-sm font-medium">
-                  <span>Sekme Erişimi</span>
+                <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-primary" />
+                    <span className="font-medium">Sekme Erişimi</span>
+                    <Badge variant="secondary" className="ml-2">{formTabs.length} seçili</Badge>
+                  </div>
                   <ChevronDown className="w-4 h-4" />
                 </CollapsibleTrigger>
-                <CollapsibleContent className="pt-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    {ALL_TABS.filter(tab => tab !== 'yetkilendirme').map(tab => (
-                      <div
-                        key={tab}
-                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${formTabs.includes(tab)
-                          ? 'border-primary bg-primary/10'
-                          : 'border-border hover:bg-muted'
-                          }`}
-                        onClick={() => toggleTab(tab)}
-                      >
-                        <Checkbox checked={formTabs.includes(tab)} />
-                        <span className="text-sm">{TAB_NAMES[tab]}</span>
-                      </div>
-                    ))}
+                <CollapsibleContent className="pt-4 space-y-4">
+                  {/* Ana Sekmeler */}
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2 font-medium">📊 Ana Sekmeler</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['dashboard', 'basvurular'] as TabKey[]).map(tab => (
+                        <div
+                          key={tab}
+                          className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${formTabs.includes(tab)
+                            ? 'border-primary bg-primary/10 shadow-sm'
+                            : 'border-border hover:bg-muted hover:border-muted-foreground/30'
+                            }`}
+                          onClick={() => toggleTab(tab)}
+                        >
+                          <Checkbox checked={formTabs.includes(tab)} className="pointer-events-none" />
+                          <span className="text-sm font-medium">{TAB_NAMES[tab]}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Not: Yetki Yönetimi sekmesi sadece Super Admin'e açıktır.
+
+                  {/* İçerik Yönetimi */}
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2 font-medium">📝 İçerik Yönetimi</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['formlar', 'guncellemeler', 'kurallar', 'sozluk'] as TabKey[]).map(tab => (
+                        <div
+                          key={tab}
+                          className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${formTabs.includes(tab)
+                            ? 'border-primary bg-primary/10 shadow-sm'
+                            : 'border-border hover:bg-muted hover:border-muted-foreground/30'
+                            }`}
+                          onClick={() => toggleTab(tab)}
+                        >
+                          <Checkbox checked={formTabs.includes(tab)} className="pointer-events-none" />
+                          <span className="text-sm font-medium">{TAB_NAMES[tab]}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Medya & İletişim */}
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2 font-medium">🖼️ Medya & İletişim</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['galeri', 'bildirimler', 'canliharita'] as TabKey[]).map(tab => (
+                        <div
+                          key={tab}
+                          className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${formTabs.includes(tab)
+                            ? 'border-primary bg-primary/10 shadow-sm'
+                            : 'border-border hover:bg-muted hover:border-muted-foreground/30'
+                            }`}
+                          onClick={() => toggleTab(tab)}
+                        >
+                          <Checkbox checked={formTabs.includes(tab)} className="pointer-events-none" />
+                          <span className="text-sm font-medium">{TAB_NAMES[tab]}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Hızlı Seçim Butonları */}
+                  <div className="flex gap-2 pt-2 border-t border-border">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFormTabs(['dashboard', 'basvurular', 'formlar', 'guncellemeler', 'kurallar', 'sozluk', 'galeri', 'bildirimler', 'canliharita'])}
+                    >
+                      Tümünü Seç
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFormTabs([])}
+                    >
+                      Tümünü Kaldır
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFormTabs(['dashboard', 'basvurular'])}
+                    >
+                      Sadece Temel
+                    </Button>
+                  </div>
+
+                  <p className="text-xs text-amber-500 bg-amber-500/10 p-2 rounded-lg flex items-start gap-2">
+                    <span>⚠️</span>
+                    <span>Kullanıcılar, Yetki Yönetimi, 2FA Yönetimi ve AI Yönetimi sekmeleri sadece Super Admin'e açıktır.</span>
                   </p>
                 </CollapsibleContent>
               </Collapsible>
 
-              {/* Management Permissions */}
-              <Collapsible>
-                <CollapsibleTrigger className="flex items-center justify-between w-full py-2 text-sm font-medium">
-                  <span>Yönetim Yetkileri</span>
+              {/* Management Permissions - Enhanced with all new permissions */}
+              <Collapsible defaultOpen>
+                <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-primary" />
+                    <span className="font-medium">Yönetim Yetkileri</span>
+                    <Badge variant="secondary" className="ml-2">
+                      {[
+                        formCanManageUsers, formCanManageApplications, formCanManageForms, formCanManageUpdates,
+                        formCanManageRules, formCanManageGallery, formCanManageNotifications, formCanManageWhiteboard,
+                        formCanManageGlossary, formCanBanUsers, formCanApproveApplications, formCanRejectApplications,
+                        formCanDeleteContent, formCanPublishContent, formCanUploadMedia, formCanSendGlobalNotifications,
+                        formCanSendTargetedNotifications, formCanSendDiscordDm, formCanManageWhitelist,
+                        formCanViewApplicationDetails, formCanViewAIConflicts
+                      ].filter(Boolean).length} aktif
+                    </Badge>
+                  </div>
                   <ChevronDown className="w-4 h-4" />
                 </CollapsibleTrigger>
-                <CollapsibleContent className="pt-2 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="manage-users">Kullanıcı Yönetimi</Label>
-                    <Switch id="manage-users" checked={formCanManageUsers} onCheckedChange={setFormCanManageUsers} />
+                <CollapsibleContent className="pt-4 space-y-4">
+
+                  {/* 📝 BAŞVURU YÖNETİMİ */}
+                  <div className="space-y-2 border border-border rounded-lg p-3">
+                    <p className="text-xs text-primary font-semibold flex items-center gap-1">📝 Başvuru Yönetimi</p>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
+                      <div>
+                        <Label htmlFor="manage-apps" className="cursor-pointer text-sm">Başvuru Genel Yönetimi</Label>
+                        <p className="text-xs text-muted-foreground">Başvuruları görüntüleme ve temel işlemler</p>
+                      </div>
+                      <Switch id="manage-apps" checked={formCanManageApplications} onCheckedChange={setFormCanManageApplications} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
+                      <div>
+                        <Label htmlFor="view-app-details" className="cursor-pointer text-sm">Başvuru Detaylarını Görme</Label>
+                        <p className="text-xs text-muted-foreground">Başvuru detay sayfasına erişim</p>
+                      </div>
+                      <Switch id="view-app-details" checked={formCanViewApplicationDetails} onCheckedChange={setFormCanViewApplicationDetails} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/5 hover:bg-emerald-500/10">
+                      <div>
+                        <Label htmlFor="approve-apps" className="cursor-pointer text-sm text-emerald-600">✅ Başvuru Onaylama</Label>
+                        <p className="text-xs text-muted-foreground">Başvuruları onaylayabilme yetkisi</p>
+                      </div>
+                      <Switch id="approve-apps" checked={formCanApproveApplications} onCheckedChange={setFormCanApproveApplications} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-red-500/5 hover:bg-red-500/10">
+                      <div>
+                        <Label htmlFor="reject-apps" className="cursor-pointer text-sm text-red-600">❌ Başvuru Reddetme</Label>
+                        <p className="text-xs text-muted-foreground">Başvuruları reddedebilme yetkisi</p>
+                      </div>
+                      <Switch id="reject-apps" checked={formCanRejectApplications} onCheckedChange={setFormCanRejectApplications} />
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="manage-apps">Başvuru Yönetimi</Label>
-                    <Switch id="manage-apps" checked={formCanManageApplications} onCheckedChange={setFormCanManageApplications} />
+
+                  {/* 📄 İÇERİK YÖNETİMİ */}
+                  <div className="space-y-2 border border-border rounded-lg p-3">
+                    <p className="text-xs text-primary font-semibold flex items-center gap-1">📄 İçerik Yönetimi</p>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
+                      <div>
+                        <Label htmlFor="manage-forms" className="cursor-pointer text-sm">Form Şablonları</Label>
+                        <p className="text-xs text-muted-foreground">Form şablonları oluşturma ve düzenleme</p>
+                      </div>
+                      <Switch id="manage-forms" checked={formCanManageForms} onCheckedChange={setFormCanManageForms} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
+                      <div>
+                        <Label htmlFor="manage-updates" className="cursor-pointer text-sm">Güncellemeler/Haberler</Label>
+                        <p className="text-xs text-muted-foreground">Haber ve güncelleme oluşturma</p>
+                      </div>
+                      <Switch id="manage-updates" checked={formCanManageUpdates} onCheckedChange={setFormCanManageUpdates} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
+                      <div>
+                        <Label htmlFor="manage-rules" className="cursor-pointer text-sm">Kurallar</Label>
+                        <p className="text-xs text-muted-foreground">Sunucu kurallarını düzenleme</p>
+                      </div>
+                      <Switch id="manage-rules" checked={formCanManageRules} onCheckedChange={setFormCanManageRules} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
+                      <div>
+                        <Label htmlFor="manage-glossary" className="cursor-pointer text-sm">Terimler Sözlüğü</Label>
+                        <p className="text-xs text-muted-foreground">Sözlük girdileri yönetimi</p>
+                      </div>
+                      <Switch id="manage-glossary" checked={formCanManageGlossary} onCheckedChange={setFormCanManageGlossary} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-blue-500/5 hover:bg-blue-500/10">
+                      <div>
+                        <Label htmlFor="publish-content" className="cursor-pointer text-sm text-blue-600">🚀 İçerik Yayınlama</Label>
+                        <p className="text-xs text-muted-foreground">Taslakları yayına alma yetkisi</p>
+                      </div>
+                      <Switch id="publish-content" checked={formCanPublishContent} onCheckedChange={setFormCanPublishContent} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-red-500/5 hover:bg-red-500/10">
+                      <div>
+                        <Label htmlFor="delete-content" className="cursor-pointer text-sm text-red-600">🗑️ İçerik Silme</Label>
+                        <p className="text-xs text-muted-foreground">Form, güncelleme, kural, galeri silme</p>
+                      </div>
+                      <Switch id="delete-content" checked={formCanDeleteContent} onCheckedChange={setFormCanDeleteContent} />
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="manage-forms">Form Yönetimi</Label>
-                    <Switch id="manage-forms" checked={formCanManageForms} onCheckedChange={setFormCanManageForms} />
+
+                  {/* 🖼️ MEDYA & İLETİŞİM */}
+                  <div className="space-y-2 border border-border rounded-lg p-3">
+                    <p className="text-xs text-primary font-semibold flex items-center gap-1">🖼️ Medya & İletişim</p>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
+                      <div>
+                        <Label htmlFor="manage-gallery" className="cursor-pointer text-sm">Galeri Yönetimi</Label>
+                        <p className="text-xs text-muted-foreground">Medya galerisini görüntüleme</p>
+                      </div>
+                      <Switch id="manage-gallery" checked={formCanManageGallery} onCheckedChange={setFormCanManageGallery} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/5 hover:bg-emerald-500/10">
+                      <div>
+                        <Label htmlFor="upload-media" className="cursor-pointer text-sm text-emerald-600">⬆️ Medya Yükleme</Label>
+                        <p className="text-xs text-muted-foreground">Görsel ve video yükleme yetkisi</p>
+                      </div>
+                      <Switch id="upload-media" checked={formCanUploadMedia} onCheckedChange={setFormCanUploadMedia} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
+                      <div>
+                        <Label htmlFor="manage-board" className="cursor-pointer text-sm">Canlı Harita</Label>
+                        <p className="text-xs text-muted-foreground">Whiteboard düzenleme</p>
+                      </div>
+                      <Switch id="manage-board" checked={formCanManageWhiteboard} onCheckedChange={setFormCanManageWhiteboard} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
+                      <div>
+                        <Label htmlFor="manage-notif" className="cursor-pointer text-sm">Bildirim Yönetimi</Label>
+                        <p className="text-xs text-muted-foreground">Bildirim sistemi genel erişimi</p>
+                      </div>
+                      <Switch id="manage-notif" checked={formCanManageNotifications} onCheckedChange={setFormCanManageNotifications} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-purple-500/5 hover:bg-purple-500/10">
+                      <div>
+                        <Label htmlFor="send-targeted-notif" className="cursor-pointer text-sm text-purple-600">👤 Hedefli Bildirim</Label>
+                        <p className="text-xs text-muted-foreground">Belirli kullanıcılara bildirim gönderme</p>
+                      </div>
+                      <Switch id="send-targeted-notif" checked={formCanSendTargetedNotifications} onCheckedChange={setFormCanSendTargetedNotifications} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-amber-500/5 hover:bg-amber-500/10">
+                      <div>
+                        <Label htmlFor="send-global-notif" className="cursor-pointer text-sm text-amber-600">🌍 Global Bildirim</Label>
+                        <p className="text-xs text-muted-foreground">Tüm kullanıcılara bildirim gönderme (dikkatli kullanın)</p>
+                      </div>
+                      <Switch id="send-global-notif" checked={formCanSendGlobalNotifications} onCheckedChange={setFormCanSendGlobalNotifications} />
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="manage-updates">Güncelleme Yönetimi</Label>
-                    <Switch id="manage-updates" checked={formCanManageUpdates} onCheckedChange={setFormCanManageUpdates} />
+
+                  {/* 👥 KULLANICI YÖNETİMİ */}
+                  <div className="space-y-2 border border-border rounded-lg p-3">
+                    <p className="text-xs text-primary font-semibold flex items-center gap-1">👥 Kullanıcı Yönetimi</p>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
+                      <div>
+                        <Label htmlFor="manage-users" className="cursor-pointer text-sm">Kullanıcı Genel Yönetimi</Label>
+                        <p className="text-xs text-muted-foreground">Kullanıcı listesini görüntüleme</p>
+                      </div>
+                      <Switch id="manage-users" checked={formCanManageUsers} onCheckedChange={setFormCanManageUsers} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/5 hover:bg-emerald-500/10">
+                      <div>
+                        <Label htmlFor="manage-whitelist" className="cursor-pointer text-sm text-emerald-600">✅ Whitelist Yönetimi</Label>
+                        <p className="text-xs text-muted-foreground">Onaylı kullanıcı listesi düzenleme</p>
+                      </div>
+                      <Switch id="manage-whitelist" checked={formCanManageWhitelist} onCheckedChange={setFormCanManageWhitelist} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-red-500/5 hover:bg-red-500/10">
+                      <div>
+                        <Label htmlFor="ban-users" className="cursor-pointer text-sm text-red-600">🚫 Kullanıcı Banlama</Label>
+                        <p className="text-xs text-muted-foreground">Kullanıcıları yasaklama yetkisi</p>
+                      </div>
+                      <Switch id="ban-users" checked={formCanBanUsers} onCheckedChange={setFormCanBanUsers} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-indigo-500/5 hover:bg-indigo-500/10">
+                      <div>
+                        <Label htmlFor="send-discord-dm" className="cursor-pointer text-sm text-indigo-600">💬 Discord DM Gönderme</Label>
+                        <p className="text-xs text-muted-foreground">Kullanıcılara Discord üzerinden mesaj</p>
+                      </div>
+                      <Switch id="send-discord-dm" checked={formCanSendDiscordDm} onCheckedChange={setFormCanSendDiscordDm} />
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="manage-rules">Kural Yönetimi</Label>
-                    <Switch id="manage-rules" checked={formCanManageRules} onCheckedChange={setFormCanManageRules} />
+
+                  {/* 🤖 AI & ÖZEL */}
+                  <div className="space-y-2 border border-amber-500/30 rounded-lg p-3 bg-amber-500/5">
+                    <p className="text-xs text-amber-600 font-semibold flex items-center gap-1">🤖 AI & Özel Yetkiler</p>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-amber-500/10">
+                      <div>
+                        <Label htmlFor="view-ai-conflicts" className="cursor-pointer text-sm">AI Çatışma Görüntüleme</Label>
+                        <p className="text-xs text-muted-foreground">AI tarafından işaretlenen çatışmalı başvuruları görme</p>
+                      </div>
+                      <Switch id="view-ai-conflicts" checked={formCanViewAIConflicts} onCheckedChange={setFormCanViewAIConflicts} />
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="manage-gallery">Galeri Yönetimi</Label>
-                    <Switch id="manage-gallery" checked={formCanManageGallery} onCheckedChange={setFormCanManageGallery} />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="manage-notif">Bildirim Yönetimi</Label>
-                    <Switch id="manage-notif" checked={formCanManageNotifications} onCheckedChange={setFormCanManageNotifications} />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="manage-board">Canlı Harita Yönetimi</Label>
-                    <Switch id="manage-board" checked={formCanManageWhiteboard} onCheckedChange={setFormCanManageWhiteboard} />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="manage-glossary">Sözlük Yönetimi</Label>
-                    <Switch id="manage-glossary" checked={formCanManageGlossary} onCheckedChange={setFormCanManageGlossary} />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="view-ai-conflicts">AI Çatışmalı Formları Görüntüleme</Label>
-                    <Switch id="view-ai-conflicts" checked={formCanViewAIConflicts} onCheckedChange={setFormCanViewAIConflicts} />
+
+                  {/* Hızlı Seçim Butonları */}
+                  <div className="flex flex-wrap gap-2 pt-4 border-t border-border">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        // Tüm yetkileri aç
+                        setFormCanManageUsers(true);
+                        setFormCanManageApplications(true);
+                        setFormCanManageForms(true);
+                        setFormCanManageUpdates(true);
+                        setFormCanManageRules(true);
+                        setFormCanManageGallery(true);
+                        setFormCanManageNotifications(true);
+                        setFormCanManageWhiteboard(true);
+                        setFormCanManageGlossary(true);
+                        setFormCanBanUsers(true);
+                        setFormCanApproveApplications(true);
+                        setFormCanRejectApplications(true);
+                        setFormCanDeleteContent(true);
+                        setFormCanPublishContent(true);
+                        setFormCanUploadMedia(true);
+                        setFormCanSendGlobalNotifications(true);
+                        setFormCanSendTargetedNotifications(true);
+                        setFormCanSendDiscordDm(true);
+                        setFormCanManageWhitelist(true);
+                        setFormCanViewApplicationDetails(true);
+                        setFormCanViewAIConflicts(true);
+                      }}
+                    >
+                      Tüm Yetkiler
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        // Sadece başvuru okuma
+                        setFormCanManageApplications(true);
+                        setFormCanViewApplicationDetails(true);
+                        // Diğerlerini kapat
+                        setFormCanManageUsers(false);
+                        setFormCanManageForms(false);
+                        setFormCanManageUpdates(false);
+                        setFormCanManageRules(false);
+                        setFormCanManageGallery(false);
+                        setFormCanManageNotifications(false);
+                        setFormCanManageWhiteboard(false);
+                        setFormCanManageGlossary(false);
+                        setFormCanBanUsers(false);
+                        setFormCanApproveApplications(false);
+                        setFormCanRejectApplications(false);
+                        setFormCanDeleteContent(false);
+                        setFormCanPublishContent(false);
+                        setFormCanUploadMedia(false);
+                        setFormCanSendGlobalNotifications(false);
+                        setFormCanSendTargetedNotifications(false);
+                        setFormCanSendDiscordDm(false);
+                        setFormCanManageWhitelist(false);
+                        setFormCanViewAIConflicts(false);
+                      }}
+                    >
+                      Sadece Görüntüleme
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        // Moderatör paketi
+                        setFormCanManageApplications(true);
+                        setFormCanViewApplicationDetails(true);
+                        setFormCanApproveApplications(true);
+                        setFormCanRejectApplications(true);
+                        setFormCanManageUsers(true);
+                        setFormCanBanUsers(true);
+                        setFormCanSendTargetedNotifications(true);
+                        setFormCanSendDiscordDm(true);
+                        // Diğerlerini kapat
+                        setFormCanManageForms(false);
+                        setFormCanManageUpdates(false);
+                        setFormCanManageRules(false);
+                        setFormCanManageGallery(false);
+                        setFormCanManageNotifications(false);
+                        setFormCanManageWhiteboard(false);
+                        setFormCanManageGlossary(false);
+                        setFormCanDeleteContent(false);
+                        setFormCanPublishContent(false);
+                        setFormCanUploadMedia(false);
+                        setFormCanSendGlobalNotifications(false);
+                        setFormCanManageWhitelist(false);
+                        setFormCanViewAIConflicts(false);
+                      }}
+                    >
+                      Moderatör Paketi
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        // Tümünü kapat
+                        setFormCanManageUsers(false);
+                        setFormCanManageApplications(false);
+                        setFormCanManageForms(false);
+                        setFormCanManageUpdates(false);
+                        setFormCanManageRules(false);
+                        setFormCanManageGallery(false);
+                        setFormCanManageNotifications(false);
+                        setFormCanManageWhiteboard(false);
+                        setFormCanManageGlossary(false);
+                        setFormCanBanUsers(false);
+                        setFormCanApproveApplications(false);
+                        setFormCanRejectApplications(false);
+                        setFormCanDeleteContent(false);
+                        setFormCanPublishContent(false);
+                        setFormCanUploadMedia(false);
+                        setFormCanSendGlobalNotifications(false);
+                        setFormCanSendTargetedNotifications(false);
+                        setFormCanSendDiscordDm(false);
+                        setFormCanManageWhitelist(false);
+                        setFormCanViewApplicationDetails(false);
+                        setFormCanViewAIConflicts(false);
+                      }}
+                    >
+                      Tümünü Kaldır
+                    </Button>
                   </div>
                 </CollapsibleContent>
               </Collapsible>

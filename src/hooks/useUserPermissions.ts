@@ -11,7 +11,12 @@ let globalPermissionCache: {
   fetchedAt: number;
 } | null = null;
 
-const CACHE_DURATION = 5 * 60 * 1000; // 5 dakika cache
+const CACHE_DURATION = 30 * 1000; // 30 saniye cache (yetki değişiklikleri için daha kısa)
+
+// Cache temizleme fonksiyonu - yetki değişikliklerinde çağrılacak
+export const clearPermissionCache = () => {
+  globalPermissionCache = null;
+};
 
 interface UseUserPermissionsReturn {
   isSuperAdmin: boolean;
@@ -20,6 +25,19 @@ interface UseUserPermissionsReturn {
   allowedTabs: TabKey[];
   canAccessTab: (tab: TabKey) => boolean;
   canManage: (feature: 'users' | 'applications' | 'forms' | 'updates' | 'rules' | 'gallery' | 'notifications' | 'whiteboard' | 'glossary') => boolean;
+  // Yeni granüler yetki kontrolleri
+  canBanUsers: boolean;
+  canApproveApplications: boolean;
+  canRejectApplications: boolean;
+  canDeleteContent: boolean;
+  canPublishContent: boolean;
+  canUploadMedia: boolean;
+  canSendGlobalNotifications: boolean;
+  canSendTargetedNotifications: boolean;
+  canSendDiscordDm: boolean;
+  canManageWhitelist: boolean;
+  canViewApplicationDetails: boolean;
+  canViewAIConflicts: boolean;
   refetch: () => Promise<void>;
 }
 
@@ -120,6 +138,25 @@ export const useUserPermissions = (): UseUserPermissionsReturn => {
     return permissions.some(p => p[featureMap[feature]] === true);
   }, [isSuperAdmin, permissions]);
 
+  // Yeni granüler yetki kontrolleri - super admin her şeyi yapabilir
+  const hasPermission = useCallback((key: keyof AdminPermission): boolean => {
+    if (isSuperAdmin) return true;
+    return permissions.some(p => p[key] === true);
+  }, [isSuperAdmin, permissions]);
+
+  const canBanUsers = hasPermission('can_ban_users');
+  const canApproveApplications = hasPermission('can_approve_applications');
+  const canRejectApplications = hasPermission('can_reject_applications');
+  const canDeleteContent = hasPermission('can_delete_content');
+  const canPublishContent = hasPermission('can_publish_content');
+  const canUploadMedia = hasPermission('can_upload_media');
+  const canSendGlobalNotifications = hasPermission('can_send_global_notifications');
+  const canSendTargetedNotifications = hasPermission('can_send_targeted_notifications');
+  const canSendDiscordDm = hasPermission('can_send_discord_dm');
+  const canManageWhitelist = hasPermission('can_manage_whitelist');
+  const canViewApplicationDetails = hasPermission('can_view_application_details');
+  const canViewAIConflicts = hasPermission('can_view_ai_conflicts');
+
   return {
     isSuperAdmin,
     isLoading,
@@ -127,6 +164,19 @@ export const useUserPermissions = (): UseUserPermissionsReturn => {
     allowedTabs,
     canAccessTab,
     canManage,
+    // Yeni granüler yetkiler
+    canBanUsers,
+    canApproveApplications,
+    canRejectApplications,
+    canDeleteContent,
+    canPublishContent,
+    canUploadMedia,
+    canSendGlobalNotifications,
+    canSendTargetedNotifications,
+    canSendDiscordDm,
+    canManageWhitelist,
+    canViewApplicationDetails,
+    canViewAIConflicts,
     refetch: () => fetchPermissions(true), // Force refetch
   };
 };

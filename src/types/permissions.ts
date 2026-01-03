@@ -3,6 +3,7 @@ export interface AdminPermission {
   name: string;
   description: string | null;
   allowed_tabs: string[];
+  // Temel yönetim yetkileri
   can_manage_users: boolean;
   can_manage_applications: boolean;
   can_manage_forms: boolean;
@@ -12,6 +13,20 @@ export interface AdminPermission {
   can_manage_notifications: boolean;
   can_manage_whiteboard: boolean;
   can_manage_glossary: boolean;
+  // Yeni granüler yetkiler
+  can_ban_users: boolean;
+  can_approve_applications: boolean;
+  can_reject_applications: boolean;
+  can_delete_content: boolean;
+  can_publish_content: boolean;
+  can_upload_media: boolean;
+  can_send_global_notifications: boolean;
+  can_send_targeted_notifications: boolean;
+  can_send_discord_dm: boolean;
+  can_manage_whitelist: boolean;
+  can_view_application_details: boolean;
+  can_view_ai_conflicts: boolean;
+  // Metadata
   created_at: string;
   updated_at: string;
   created_by: string | null;
