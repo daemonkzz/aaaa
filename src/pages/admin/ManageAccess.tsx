@@ -12,7 +12,8 @@ import {
   Loader2,
   Copy,
   Check,
-  Eye
+  Eye,
+  RefreshCw
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -79,6 +80,7 @@ const ManageAccessContent: React.FC = () => {
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
   const [provisioningUserId, setProvisioningUserId] = useState<string | null>(null);
   const [unblockingUserId, setUnblockingUserId] = useState<string | null>(null);
+  const [resettingTotpUserId, setResettingTotpUserId] = useState<string | null>(null);
 
   // QR Modal State
   const [qrModalOpen, setQrModalOpen] = useState(false);
@@ -483,6 +485,64 @@ const ManageAccessContent: React.FC = () => {
     }
   };
 
+  // TOTP Kodunu Yenile (Sadece Super Admin)
+  const handleResetTotp = async (userId: string, username: string | null) => {
+    setResettingTotpUserId(userId);
+    try {
+      // Yeni secret üret
+      const { secret } = await generateTOTP();
+
+      // Create OTP Auth URI
+      const otpAuthUri = getTOTPAuthUri({
+        secret,
+        issuer: 'HayalRP Admin',
+        accountName: username || 'Admin',
+        algorithm: 'SHA-1',
+        digits: 6,
+        period: 30,
+      });
+
+      // Generate QR code
+      const qrDataUrl = await QRCode.toDataURL(otpAuthUri, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: '#ffffff',
+          light: '#00000000',
+        },
+      });
+
+      // Update secret in database
+      const { error } = await supabase
+        .from('admin_2fa_settings')
+        .update({
+          totp_secret: secret,
+          is_provisioned: true,
+        })
+        .eq('user_id', userId);
+
+      if (error) {
+        if (import.meta.env.DEV) console.error('Reset TOTP error:', error);
+        toast.error('TOTP kodu yenilenirken hata oluştu');
+        return;
+      }
+
+      // Show QR modal with new code
+      setQrCodeUrl(qrDataUrl);
+      setTotpSecret(secret);
+      setQrModalUsername(username);
+      setQrModalOpen(true);
+
+      toast.success('TOTP kodu yenilendi. Eski kod artık çalışmayacak.');
+      fetchAdminList();
+    } catch (error) {
+      if (import.meta.env.DEV) console.error('Reset TOTP error:', error);
+      toast.error('TOTP kodu yenilenirken hata oluştu');
+    } finally {
+      setResettingTotpUserId(null);
+    }
+  };
+
   // Copy secret to clipboard
   const copySecret = async () => {
     if (totpSecret) {
@@ -684,6 +744,26 @@ const ManageAccessContent: React.FC = () => {
                           >
                             <Unlock className="w-4 h-4 mr-1" />
                             Blokajı Kaldır
+                          </Button>
+                        )}
+
+                        {/* TOTP Reset Button - sadece provisioned ve super admin için */}
+                        {item.is_provisioned && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleResetTotp(item.user_id, item.profile?.username || null)}
+                            disabled={resettingTotpUserId === item.user_id}
+                            className="text-amber-500 border-amber-500/30 hover:bg-amber-500/10"
+                          >
+                            {resettingTotpUserId === item.user_id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <>
+                                <RefreshCw className="w-4 h-4 mr-1" />
+                                Kodu Yenile
+                              </>
+                            )}
                           </Button>
                         )}
 
